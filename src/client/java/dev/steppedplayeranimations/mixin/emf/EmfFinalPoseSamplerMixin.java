@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,8 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
@@ -31,8 +33,8 @@ abstract class EmfFinalPoseSamplerMixin {
     private static Field entityRenderCount;
     private static Method getCurrentEntity;
     private static boolean reflectionFailed;
-    private static boolean loggedCapture;
-    private static boolean loggedHold;
+    private static final Set<String> LOGGED_CAPTURE_MODELS = new LinkedHashSet<>();
+    private static final Set<String> LOGGED_HOLD_MODELS = new LinkedHashSet<>();
 
     @Inject(
             method = "method_22699",
@@ -57,14 +59,14 @@ abstract class EmfFinalPoseSamplerMixin {
         try {
             steppedPlayerAnimations$initializeReflection();
             Object currentEntity = getCurrentEntity.invoke(null);
-            if (!(currentEntity instanceof Entity entity)) {
+            if (!(currentEntity instanceof LivingEntity entity)) {
                 return;
             }
 
             Object root = getRoot.invoke(this);
             Object modelId = modelName.get(root);
             String emfModelName = (String) getFileName.invoke(modelId);
-            if (emfModelName == null || !emfModelName.startsWith("player")) {
+            if (emfModelName == null) {
                 return;
             }
 
@@ -81,7 +83,7 @@ abstract class EmfFinalPoseSamplerMixin {
         } catch (ReflectiveOperationException | ClassCastException exception) {
             reflectionFailed = true;
             SteppedPlayerAnimationsClient.LOGGER.error(
-                    "Could not sample the final EMF player pose; disabling the 12 FPS sampler.",
+                    "Could not sample the final EMF living-entity pose; disabling the 12 FPS sampler.",
                     exception
             );
         }
@@ -110,8 +112,7 @@ abstract class EmfFinalPoseSamplerMixin {
             state.lastSampleNanos = topologyChanged || elapsed < 0L
                     ? now
                     : now - elapsed % SAMPLE_INTERVAL_NANOS;
-            if (!loggedCapture) {
-                loggedCapture = true;
+            if (LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "12 FPS final-pose sampling active: model={}, entity={}, parts={}, interval={} ns.",
                         modelName, entityId, parts.size(), SAMPLE_INTERVAL_NANOS
@@ -119,8 +120,7 @@ abstract class EmfFinalPoseSamplerMixin {
             }
         } else {
             state.snapshot.restore();
-            if (!loggedHold) {
-                loggedHold = true;
+            if (LOGGED_HOLD_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "12 FPS final-pose hold confirmed between samples: model={}, entity={}, parts={}.",
                         modelName, entityId, parts.size()
