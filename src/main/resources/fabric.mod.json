@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "stepped_player_animations",
+  "version": "${version}",
+  "name": "Stepped Player Animations",
+  "description": "Client-side stepped animation rendering for the player model.",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.steppedplayeranimations.SteppedPlayerAnimationsClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.17.2",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": ">=0.116.5"
+  }
+}
