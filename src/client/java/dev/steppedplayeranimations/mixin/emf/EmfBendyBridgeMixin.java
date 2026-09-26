@@ -57,6 +57,8 @@ abstract class EmfBendyBridgeMixin {
             Collections.newSetFromMap(new WeakHashMap<>());
 
     private static final Map<String, String> BEND_SOURCES = Map.of(
+            "body", "torso",
+            "jacket", "torso",
             "right_arm", "rightArm",
             "right_sleeve", "rightArm",
             "left_arm", "leftArm",
@@ -120,10 +122,13 @@ abstract class EmfBendyBridgeMixin {
                 for (Object visiblePartObject : visibleParts) {
                     ModelPart visiblePart = (ModelPart) visiblePartObject;
                     if (INITIALIZED_PARTS.add(visiblePart)) {
-                        // PlayerAnimator initializes vanilla arms, sleeves, legs, and pants from
-                        // their upper end. Using DOWN reverses the bend and turns elbows/knees
-                        // outward on EMF cubes.
-                        IBendHelper.INSTANCE.initBend(visiblePart, Direction.UP);
+                        // Match PlayerAnimator's own pivot convention: the torso and jacket bend
+                        // from their lower end, while limbs and their overlay layers bend from
+                        // their upper end.
+                        Direction bendDirection = mapping.getValue().equals("torso")
+                                ? Direction.DOWN
+                                : Direction.UP;
+                        IBendHelper.INSTANCE.initBend(visiblePart, bendDirection);
                     }
                     IBendHelper.INSTANCE.bend(visiblePart, bend);
                 }
