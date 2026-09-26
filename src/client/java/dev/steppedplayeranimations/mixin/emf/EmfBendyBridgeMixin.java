@@ -74,7 +74,7 @@ abstract class EmfBendyBridgeMixin {
     private static Method getAllCustomChildren;
     private static Field entitiesPausedParts;
     private static boolean reflectionFailed;
-    private static boolean loggedNonZeroBend;
+    private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
 
     @Inject(method = "animate", at = @At("HEAD"))
@@ -110,9 +110,12 @@ abstract class EmfBendyBridgeMixin {
                     continue;
                 }
 
-                Pair<Float, Float> bend = active ? animation.getBend(mapping.getValue()) : ZERO_BEND;
-                if (active && !loggedNonZeroBend && Math.abs(bend.getRight()) >= 0.0001F) {
-                    loggedNonZeroBend = true;
+                Pair<Float, Float> bend = active
+                        ? steppedPlayerAnimations$getBend(animation, mapping.getValue())
+                        : ZERO_BEND;
+                if (active
+                        && Math.abs(bend.getRight()) >= 0.0001F
+                        && LOGGED_NON_ZERO_BEND_SOURCES.add(mapping.getValue())) {
                     SteppedPlayerAnimationsClient.LOGGER.info(
                             "Forwarding non-zero bend to FA Player cubes: source={}, axis={}, angle={}",
                             mapping.getValue(), bend.getLeft(), bend.getRight()
@@ -144,6 +147,25 @@ abstract class EmfBendyBridgeMixin {
             reflectionFailed = true;
             SteppedPlayerAnimationsClient.LOGGER.error("Could not forward PlayerAnimator bends to EMF model cubes; disabling the bend bridge.", exception);
         }
+    }
+
+    private static Pair<Float, Float> steppedPlayerAnimations$getBend(
+            AnimationApplier animation,
+            String source
+    ) {
+        Pair<Float, Float> bend = animation.getBend(source);
+        if (!source.equals("torso")) {
+            return bend;
+        }
+
+        // AnimationApplier.updatePart("torso", ...) combines these two legacy
+        // channels. Some Emotecraft animations put the actual waist bend in
+        // "body", so forwarding only "torso" silently produces a straight cube.
+        Pair<Float, Float> legacyBodyBend = animation.getBend("body");
+        return new Pair<>(
+                bend.getLeft() + legacyBodyBend.getLeft(),
+                bend.getRight() + legacyBodyBend.getRight()
+        );
     }
 
     private static void steppedPlayerAnimations$updatePartialPause(
