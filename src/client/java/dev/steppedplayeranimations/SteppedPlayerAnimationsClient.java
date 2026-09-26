@@ -19,9 +19,10 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
         requireMod(missing, "entity_texture_features");
         requireMod(missing, "emotecraft");
         requireMod(missing, "playeranimator");
+        requireMod(missing, "bendy-lib");
 
         if (missing.isEmpty()) {
-            LOGGER.info("Compatibility bridge enabled: FA Player animations pause during Emotecraft playback while the custom player model remains available.");
+            LOGGER.info("Compatibility bridge enabled: FA Player animations pause during Emotecraft playback, the custom model remains available, and bend data is forwarded to its visible cubes.");
         } else {
             LOGGER.info("Compatibility bridge inactive; optional test-stack mods not loaded: {}", String.join(", ", missing));
         }

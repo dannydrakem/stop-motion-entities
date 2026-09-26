@@ -15,6 +15,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
     private static final String EMF = "entity_model_features";
     private static final String EMOTECRAFT = "emotecraft";
     private static final String PLAYER_ANIMATOR = "playeranimator";
+    private static final String BENDY_LIB = "bendy-lib";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -33,7 +34,9 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         }
 
         boolean apply;
-        if (mixinClassName.endsWith("EmfPlayerAnimatorFallbackMixin")) {
+        if (mixinClassName.endsWith("EmfBendyBridgeMixin")) {
+            apply = loader.isModLoaded(PLAYER_ANIMATOR) && loader.isModLoaded(BENDY_LIB);
+        } else if (mixinClassName.endsWith("EmfPlayerAnimatorFallbackMixin")) {
             apply = loader.isModLoaded(PLAYER_ANIMATOR);
         } else {
             apply = true;

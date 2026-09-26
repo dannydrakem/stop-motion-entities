@@ -23,6 +23,10 @@ loom {
 
 repositories {
     mavenCentral()
+    maven {
+        name = "KosmX"
+        url = "https://maven.kosmx.dev/"
+    }
     exclusiveContent {
         forRepository {
             maven {
@@ -44,6 +48,8 @@ dependencies {
 
     // Optional at runtime, but present at compile time so Mixin can validate the two pinned EMF targets.
     compileOnly "maven.modrinth:entity-model-features:3.3.9-fabric-1.21"
+    modCompileOnly "dev.kosmx.player-anim:player-animation-lib-fabric:2.0.4+1.21.1"
+    modCompileOnly "io.github.kosmx.bendy-lib:bendy-lib-fabric:5.1"
 }
 
 def modVersion = project.version.toString()
