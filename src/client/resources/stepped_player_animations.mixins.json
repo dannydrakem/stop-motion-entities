@@ -9,7 +9,7 @@
     "emf.EmfBendyBridgeMixin",
     "emf.EmfBendyCubeRenderMixin",
     "emf.EmfEmotecraftPartialPauseMixin",
-    "emf.EmfFinalPoseProbeMixin",
+    "emf.EmfFinalPoseSamplerMixin",
     "emf.EmfPlayerAnimatorFallbackMixin"
   ],
   "injectors": {
