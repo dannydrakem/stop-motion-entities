@@ -5,8 +5,10 @@
   "plugin": "dev.steppedplayeranimations.mixin.CompatibilityMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "emf.EmfAnimationPartRestoreMixin",
     "emf.EmfBendyBridgeMixin",
     "emf.EmfBendyCubeRenderMixin",
+    "emf.EmfEmotecraftPartialPauseMixin",
     "emf.EmfPlayerAnimatorFallbackMixin"
   ],
   "injectors": {
