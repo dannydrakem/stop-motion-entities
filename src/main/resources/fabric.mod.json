@@ -10,10 +10,19 @@
       "dev.steppedplayeranimations.SteppedPlayerAnimationsClient"
     ]
   },
+  "mixins": [
+    "stepped_player_animations.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.17.2",
     "minecraft": "1.21.1",
     "java": ">=21",
     "fabric-api": ">=0.116.5"
+  },
+  "suggests": {
+    "entity_model_features": ">=3.3.9",
+    "entity_texture_features": ">=7.2.4",
+    "emotecraft": ">=2.4.12",
+    "playeranimator": ">=2.0.4+1.21.1"
   }
 }

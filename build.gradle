@@ -23,6 +23,17 @@ loom {
 
 repositories {
     mavenCentral()
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 dependencies {
@@ -30,6 +41,9 @@ dependencies {
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    // Optional at runtime, but present at compile time so Mixin can validate the two pinned EMF targets.
+    compileOnly "maven.modrinth:entity-model-features:3.3.9-fabric-1.21"
 }
 
 def modVersion = project.version.toString()

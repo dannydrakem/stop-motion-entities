@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.steppedplayeranimations.mixin",
+  "plugin": "dev.steppedplayeranimations.mixin.CompatibilityMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "emf.EmfEmotecraftPauseMixin",
+    "emf.EmfPlayerAnimatorFallbackMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
