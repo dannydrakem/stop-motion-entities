@@ -200,17 +200,27 @@ abstract class EmfBendyBridgeMixin {
 
                 pausedParts.add(modelPart);
                 Object[] customChildren = (Object[]) getAllCustomChildren.invoke(vanillaPart);
-                for (Object customChild : customChildren) {
-                    if (group.equals("head") && steppedPlayerAnimations$isJustExpressionsFace(customChild)) {
-                        if (!loggedJustExpressionsFace) {
-                            loggedJustExpressionsFace = true;
-                            SteppedPlayerAnimationsClient.LOGGER.info(
-                                    "Just Expressions face branch detected; keeping player_face animated during Emotecraft."
-                            );
+                Set<ModelPart> liveFaceParts = Collections.newSetFromMap(new IdentityHashMap<>());
+                if (group.equals("head")) {
+                    for (Object customChild : customChildren) {
+                        if (steppedPlayerAnimations$isJustExpressionsFace(customChild)) {
+                            ((ModelPart) customChild).getAllParts().forEach(liveFaceParts::add);
                         }
-                        continue;
                     }
-                    ((ModelPart) customChild).getAllParts().forEach(pausedParts::add);
+                }
+                for (Object customChild : customChildren) {
+                    for (ModelPart descendant : ((ModelPart) customChild).getAllParts().toList()) {
+                        if (!liveFaceParts.contains(descendant)) {
+                            pausedParts.add(descendant);
+                        }
+                    }
+                }
+                if (!liveFaceParts.isEmpty() && !loggedJustExpressionsFace) {
+                    loggedJustExpressionsFace = true;
+                    SteppedPlayerAnimationsClient.LOGGER.info(
+                            "Just Expressions face branch detected; keeping all {} player_face parts animated during Emotecraft.",
+                            liveFaceParts.size()
+                    );
                 }
             }
         }
