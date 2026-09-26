@@ -34,7 +34,8 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         }
 
         boolean apply;
-        if (mixinClassName.endsWith("EmfBendyBridgeMixin")) {
+        if (mixinClassName.endsWith("EmfBendyBridgeMixin")
+                || mixinClassName.endsWith("EmfBendyCubeRenderMixin")) {
             apply = loader.isModLoaded(PLAYER_ANIMATOR) && loader.isModLoaded(BENDY_LIB);
         } else if (mixinClassName.endsWith("EmfPlayerAnimatorFallbackMixin")) {
             apply = loader.isModLoaded(PLAYER_ANIMATOR);

@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "emf.EmfBendyBridgeMixin",
+    "emf.EmfBendyCubeRenderMixin",
     "emf.EmfPlayerAnimatorFallbackMixin"
   ],
   "injectors": {

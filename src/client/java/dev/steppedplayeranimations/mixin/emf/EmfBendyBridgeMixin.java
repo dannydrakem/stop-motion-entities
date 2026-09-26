@@ -79,7 +79,10 @@ abstract class EmfBendyBridgeMixin {
                 for (Object visiblePartObject : visibleParts) {
                     ModelPart visiblePart = (ModelPart) visiblePartObject;
                     if (INITIALIZED_PARTS.add(visiblePart)) {
-                        IBendHelper.INSTANCE.initBend(visiblePart, Direction.DOWN);
+                        // PlayerAnimator initializes vanilla arms, sleeves, legs, and pants from
+                        // their upper end. Using DOWN reverses the bend and turns elbows/knees
+                        // outward on EMF cubes.
+                        IBendHelper.INSTANCE.initBend(visiblePart, Direction.UP);
                     }
                     IBendHelper.INSTANCE.bend(visiblePart, bend);
                 }
