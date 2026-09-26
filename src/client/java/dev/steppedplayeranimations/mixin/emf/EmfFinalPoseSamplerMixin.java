@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -59,7 +59,7 @@ abstract class EmfFinalPoseSamplerMixin {
         try {
             steppedPlayerAnimations$initializeReflection();
             Object currentEntity = getCurrentEntity.invoke(null);
-            if (!(currentEntity instanceof LivingEntity entity)) {
+            if (!(currentEntity instanceof Entity entity)) {
                 return;
             }
 
@@ -83,7 +83,7 @@ abstract class EmfFinalPoseSamplerMixin {
         } catch (ReflectiveOperationException | ClassCastException exception) {
             reflectionFailed = true;
             SteppedPlayerAnimationsClient.LOGGER.error(
-                    "Could not sample the final EMF living-entity pose; disabling the 12 FPS sampler.",
+                    "Could not sample the final EMF entity pose; disabling the 12 FPS sampler.",
                     exception
             );
         }

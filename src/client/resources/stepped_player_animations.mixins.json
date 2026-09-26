@@ -5,6 +5,8 @@
   "plugin": "dev.steppedplayeranimations.mixin.CompatibilityMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "vehicle.BoatPaddleSamplerMixin",
+    "vehicle.MinecartWobbleSamplerMixin",
     "emf.EmfAnimationPartRestoreMixin",
     "emf.EmfBendyBridgeMixin",
     "emf.EmfBendyCubeRenderMixin",
