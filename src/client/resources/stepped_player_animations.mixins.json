@@ -5,7 +5,6 @@
   "plugin": "dev.steppedplayeranimations.mixin.CompatibilityMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "emf.EmfEmotecraftPauseMixin",
     "emf.EmfPlayerAnimatorFallbackMixin"
   ],
   "injectors": {

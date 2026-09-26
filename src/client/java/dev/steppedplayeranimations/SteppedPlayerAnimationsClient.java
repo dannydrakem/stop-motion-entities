@@ -21,9 +21,9 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
         requireMod(missing, "playeranimator");
 
         if (missing.isEmpty()) {
-            LOGGER.info("Stage 3 compatibility bridge enabled: EMF custom player models will remain available while Emotecraft is active.");
+            LOGGER.info("Compatibility bridge enabled: FA Player animations pause during Emotecraft playback while the custom player model remains available.");
         } else {
-            LOGGER.info("Stage 3 compatibility bridge inactive; optional test-stack mods not loaded: {}", String.join(", ", missing));
+            LOGGER.info("Compatibility bridge inactive; optional test-stack mods not loaded: {}", String.join(", ", missing));
         }
     }
 

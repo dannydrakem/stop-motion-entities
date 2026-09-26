@@ -40,7 +40,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         }
 
         if (apply) {
-            LOGGER.info("Applying stage 3 compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
+            LOGGER.info("Applying compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
         }
         return apply;
     }
