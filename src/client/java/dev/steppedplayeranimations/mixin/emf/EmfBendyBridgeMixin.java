@@ -73,7 +73,9 @@ abstract class EmfBendyBridgeMixin {
     private static Method getAllVanillaParts;
     private static Method getAllCustomChildren;
     private static Field entitiesPausedParts;
+    private static Field customPartId;
     private static boolean reflectionFailed;
+    private static boolean loggedJustExpressionsFace;
     private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
 
@@ -199,6 +201,15 @@ abstract class EmfBendyBridgeMixin {
                 pausedParts.add(modelPart);
                 Object[] customChildren = (Object[]) getAllCustomChildren.invoke(vanillaPart);
                 for (Object customChild : customChildren) {
+                    if (group.equals("head") && steppedPlayerAnimations$isJustExpressionsFace(customChild)) {
+                        if (!loggedJustExpressionsFace) {
+                            loggedJustExpressionsFace = true;
+                            SteppedPlayerAnimationsClient.LOGGER.info(
+                                    "Just Expressions face branch detected; keeping player_face animated during Emotecraft."
+                            );
+                        }
+                        continue;
+                    }
                     ((ModelPart) customChild).getAllParts().forEach(pausedParts::add);
                 }
             }
@@ -218,6 +229,11 @@ abstract class EmfBendyBridgeMixin {
                     mask
             );
         }
+    }
+
+    private static boolean steppedPlayerAnimations$isJustExpressionsFace(Object customChild)
+            throws IllegalAccessException {
+        return "player_face".equals(customPartId.get(customChild));
     }
 
     private static boolean steppedPlayerAnimations$isControlled(AnimationApplier animation, String partName) {
@@ -256,10 +272,12 @@ abstract class EmfBendyBridgeMixin {
         Class<?> animationApi = Class.forName("traben.entity_model_features.EMFAnimationApi");
         Class<?> rootClass = Class.forName("traben.entity_model_features.models.parts.EMFModelPartRoot");
         Class<?> vanillaPartClass = Class.forName("traben.entity_model_features.models.parts.EMFModelPartVanilla");
+        Class<?> customPartClass = Class.forName("traben.entity_model_features.models.parts.EMFModelPartCustom");
         Class<?> pauseHandlerClass = Class.forName("traben.entity_model_features.utils.EMFAnimationPauseHandler");
         getCurrentEntity = animationApi.getMethod("getCurrentEntity");
         getAllVanillaParts = rootClass.getMethod("getAllVanillaPartsByNameEMF");
         getAllCustomChildren = vanillaPartClass.getMethod("getAllEMFCustomChildren");
+        customPartId = customPartClass.getField("id");
         entitiesPausedParts = pauseHandlerClass.getField("entitiesPausedParts");
     }
 }
