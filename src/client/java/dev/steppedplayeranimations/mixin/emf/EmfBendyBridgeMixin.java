@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.mixin.emf;
 
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.compat.emf.EmfPartBlendState;
+import dev.steppedplayeranimations.mixin.vanilla.ModelPartChildrenAccessor;
 import dev.kosmx.playerAnim.api.TransformType;
 import dev.kosmx.playerAnim.core.util.Vec3f;
 import dev.kosmx.playerAnim.core.util.Pair;
@@ -76,6 +77,7 @@ abstract class EmfBendyBridgeMixin {
     private static Field customPartId;
     private static boolean reflectionFailed;
     private static boolean loggedJustExpressionsFace;
+    private static boolean loggedPlayerHeadHierarchy;
     private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
 
@@ -184,6 +186,10 @@ abstract class EmfBendyBridgeMixin {
 
         Set<ModelPart> pausedParts = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<String> controlledGroups = new LinkedHashSet<>();
+        if (!loggedPlayerHeadHierarchy) {
+            loggedPlayerHeadHierarchy = true;
+            steppedPlayerAnimations$dumpPlayerHeadHierarchy(vanillaParts);
+        }
         for (String group : BLEND_GROUPS) {
             boolean controlled = ANIMATION_SOURCES.get(group).stream()
                     .anyMatch(source -> steppedPlayerAnimations$isControlled(animation, source));
@@ -243,7 +249,110 @@ abstract class EmfBendyBridgeMixin {
 
     private static boolean steppedPlayerAnimations$isJustExpressionsFace(Object customChild)
             throws IllegalAccessException {
-        return "player_face".equals(customPartId.get(customChild));
+        String id = steppedPlayerAnimations$normalizeEmfId(
+                String.valueOf(customPartId.get(customChild))
+        );
+        if ("player_face".equals(id)) {
+            return true;
+        }
+
+        // EMF may rename the imported JPM root when its ID collides with an existing child.
+        // The actual Just Expressions root has a stable structural signature even in that case:
+        // its direct children contain the eyes and brows groups (and normally extras as well).
+        Map<String, ModelPart> children =
+                ((ModelPartChildrenAccessor) customChild).steppedPlayerAnimations$children();
+        Set<String> normalizedChildNames = new LinkedHashSet<>();
+        for (String childName : children.keySet()) {
+            normalizedChildNames.add(steppedPlayerAnimations$normalizeEmfId(childName));
+        }
+        return normalizedChildNames.contains("eyes") && normalizedChildNames.contains("brows");
+    }
+
+    private static String steppedPlayerAnimations$normalizeEmfId(String id) {
+        String normalized = id;
+        while (normalized.startsWith("EMF_")) {
+            normalized = normalized.substring(4);
+        }
+        return normalized;
+    }
+
+    private static void steppedPlayerAnimations$dumpPlayerHeadHierarchy(Map<String, Object> vanillaParts)
+            throws IllegalAccessException {
+        StringBuilder dump = new StringBuilder(8192);
+        dump.append("Runtime EMF player head hierarchy (diagnostic stage 22.1).\n")
+                .append("Available vanilla-part keys: ")
+                .append(vanillaParts.keySet())
+                .append('\n');
+
+        Set<ModelPart> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        int[] remaining = {512};
+        for (String rootName : List.of("head", "hat")) {
+            Object root = vanillaParts.get(rootName);
+            if (root instanceof ModelPart modelPart) {
+                steppedPlayerAnimations$appendPartHierarchy(
+                        dump,
+                        rootName,
+                        modelPart,
+                        0,
+                        visited,
+                        remaining
+                );
+            } else {
+                dump.append(rootName).append(" = <missing>\n");
+            }
+        }
+        if (remaining[0] == 0) {
+            dump.append("<diagnostic truncated after 512 unique parts>\n");
+        }
+
+        SteppedPlayerAnimationsClient.LOGGER.info("{}", dump);
+    }
+
+    private static void steppedPlayerAnimations$appendPartHierarchy(
+            StringBuilder dump,
+            String path,
+            ModelPart part,
+            int depth,
+            Set<ModelPart> visited,
+            int[] remaining
+    ) throws IllegalAccessException {
+        if (remaining[0] <= 0 || depth > 24) {
+            return;
+        }
+
+        String internalId = "-";
+        if (customPartId.getDeclaringClass().isInstance(part)) {
+            Object value = customPartId.get(part);
+            internalId = String.valueOf(value);
+        }
+        dump.append("  ".repeat(depth))
+                .append(path)
+                .append(" | class=")
+                .append(part.getClass().getName())
+                .append(" | id=")
+                .append(internalId)
+                .append(" | identity=")
+                .append(Integer.toHexString(System.identityHashCode(part)))
+                .append('\n');
+
+        if (!visited.add(part)) {
+            dump.append("  ".repeat(depth + 1)).append("<already visited>\n");
+            return;
+        }
+        remaining[0]--;
+
+        Map<String, ModelPart> children =
+                ((ModelPartChildrenAccessor) (Object) part).steppedPlayerAnimations$children();
+        for (Map.Entry<String, ModelPart> child : children.entrySet()) {
+            steppedPlayerAnimations$appendPartHierarchy(
+                    dump,
+                    path + "/" + child.getKey(),
+                    child.getValue(),
+                    depth + 1,
+                    visited,
+                    remaining
+            );
+        }
     }
 
     private static boolean steppedPlayerAnimations$isControlled(AnimationApplier animation, String partName) {

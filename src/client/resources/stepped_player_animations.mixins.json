@@ -8,6 +8,7 @@
     "vanilla.AgeableListModelAccessor",
     "vanilla.EntityRenderDispatcherAccessor",
     "vanilla.InventoryEntityRenderContextMixin",
+    "vanilla.ModelPartChildrenAccessor",
     "vanilla.VanillaLivingEntityPoseSamplerMixin",
     "vehicle.BoatPaddleSamplerMixin",
     "vehicle.MinecartWobbleSamplerMixin",
