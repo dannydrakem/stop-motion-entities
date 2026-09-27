@@ -3,6 +3,7 @@ package dev.steppedplayeranimations.mixin.emf;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,7 +25,6 @@ import java.util.WeakHashMap;
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartWithState", remap = false)
 abstract class EmfFinalPoseSamplerMixin {
-    private static final long SAMPLE_INTERVAL_NANOS = 1_000_000_000L / 12L;
     private static final Map<Object, Map<UUID, SampleState>> SAMPLES = new WeakHashMap<>();
     private static Method getRoot;
     private static Field modelName;
@@ -78,7 +78,7 @@ abstract class EmfFinalPoseSamplerMixin {
                     entity.getUUID(),
                     emfModelName,
                     renderSequence,
-                    System.nanoTime()
+                    SteppedAnimationClock.nowNanos()
             );
         } catch (ReflectiveOperationException | ClassCastException exception) {
             reflectionFailed = true;
@@ -106,16 +106,13 @@ abstract class EmfFinalPoseSamplerMixin {
 
         List<ModelPart> parts = root.getAllParts().toList();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
-        long elapsed = now - state.lastSampleNanos;
-        if (topologyChanged || elapsed < 0L || elapsed >= SAMPLE_INTERVAL_NANOS) {
+        boolean sampleDue = state.gate.shouldCapture(now);
+        if (topologyChanged || sampleDue) {
             state.snapshot = PoseSnapshot.capture(parts);
-            state.lastSampleNanos = topologyChanged || elapsed < 0L
-                    ? now
-                    : now - elapsed % SAMPLE_INTERVAL_NANOS;
             if (LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "12 FPS final-pose sampling active: model={}, entity={}, parts={}, interval={} ns.",
-                        modelName, entityId, parts.size(), SAMPLE_INTERVAL_NANOS
+                        modelName, entityId, parts.size(), SteppedAnimationClock.SAMPLE_INTERVAL_NANOS
                 );
             }
         } else {
@@ -149,7 +146,7 @@ abstract class EmfFinalPoseSamplerMixin {
 
     private static final class SampleState {
         private long lastRenderSequence = Long.MIN_VALUE;
-        private long lastSampleNanos;
+        private final SteppedAnimationClock.Gate gate = new SteppedAnimationClock.Gate();
         private PoseSnapshot snapshot;
     }
 

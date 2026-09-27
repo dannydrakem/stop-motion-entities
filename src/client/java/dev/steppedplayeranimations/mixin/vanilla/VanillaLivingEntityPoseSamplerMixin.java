@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.mixin.vanilla;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.AgeableListModel;
 import net.minecraft.client.model.HierarchicalModel;
@@ -30,8 +31,6 @@ import java.util.WeakHashMap;
 
 @Mixin(LivingEntityRenderer.class)
 abstract class VanillaLivingEntityPoseSamplerMixin {
-    @Unique
-    private static final long steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS = 1_000_000_000L / 12L;
     @Unique
     private static final Map<EntityModel<?>, Map<UUID, SampleState>> steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
     @Unique
@@ -72,21 +71,18 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
                 ignored -> new HashMap<>()
         );
         SampleState state = byEntity.computeIfAbsent(entity.getUUID(), ignored -> new SampleState());
-        long now = System.nanoTime();
-        long elapsed = now - state.lastSampleNanos;
+        long now = SteppedAnimationClock.nowNanos();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
-        if (topologyChanged || elapsed < 0L || elapsed >= steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS) {
+        boolean sampleDue = state.gate.shouldCapture(now);
+        if (topologyChanged || sampleDue) {
             state.snapshot = PoseSnapshot.capture(parts);
-            state.lastSampleNanos = topologyChanged || elapsed < 0L
-                    ? now
-                    : now - elapsed % steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS;
             if (steppedPlayerAnimations$LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "12 FPS vanilla-pose sampling active: model={}, entity={}, parts={}, interval={} ns.",
                         modelName,
                         entity.getUUID(),
                         parts.size(),
-                        steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS
+                        SteppedAnimationClock.SAMPLE_INTERVAL_NANOS
                 );
             }
         } else {
@@ -141,7 +137,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
 
     @Unique
     private static final class SampleState {
-        private long lastSampleNanos;
+        private final SteppedAnimationClock.Gate gate = new SteppedAnimationClock.Gate();
         private PoseSnapshot snapshot;
     }
 

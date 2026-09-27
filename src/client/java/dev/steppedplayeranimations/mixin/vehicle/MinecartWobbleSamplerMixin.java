@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.mixin.vehicle;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.MinecartRenderer;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
@@ -19,8 +20,6 @@ import java.util.UUID;
 
 @Mixin(MinecartRenderer.class)
 abstract class MinecartWobbleSamplerMixin {
-    @Unique
-    private static final long steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS = 1_000_000_000L / 12L;
     @Unique
     private static final Map<UUID, WobbleState> steppedPlayerAnimations$WOBBLE_STATES = new HashMap<>();
     @Unique
@@ -68,17 +67,13 @@ abstract class MinecartWobbleSamplerMixin {
             return angle;
         }
 
-        long now = System.nanoTime();
+        long now = SteppedAnimationClock.nowNanos();
         WobbleState state = steppedPlayerAnimations$WOBBLE_STATES.computeIfAbsent(
                 minecart.getUUID(),
                 ignored -> new WobbleState()
         );
-        long elapsed = now - state.lastSampleNanos;
-        if (!state.initialized || elapsed < 0L || elapsed >= steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS) {
+        if (state.gate.shouldCapture(now)) {
             state.angle = angle;
-            state.lastSampleNanos = !state.initialized || elapsed < 0L
-                    ? now
-                    : now - elapsed % steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS;
             state.initialized = true;
         } else if (!steppedPlayerAnimations$logged && Math.abs(angle) >= 0.0001F) {
             steppedPlayerAnimations$logged = true;
@@ -107,7 +102,7 @@ abstract class MinecartWobbleSamplerMixin {
 
     @Unique
     private static final class WobbleState {
-        private long lastSampleNanos;
+        private final SteppedAnimationClock.Gate gate = new SteppedAnimationClock.Gate();
         private boolean initialized;
         private float angle;
     }

@@ -1,6 +1,7 @@
 package dev.steppedplayeranimations.mixin.vehicle;
 
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.BoatModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -18,8 +19,6 @@ import java.util.UUID;
 
 @Mixin(BoatModel.class)
 abstract class BoatPaddleSamplerMixin {
-    @Unique
-    private static final long steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS = 1_000_000_000L / 12L;
     @Unique
     private static boolean steppedPlayerAnimations$logged;
     @Unique
@@ -45,17 +44,13 @@ abstract class BoatPaddleSamplerMixin {
             float headPitch,
             CallbackInfo callback
     ) {
-        long now = System.nanoTime();
+        long now = SteppedAnimationClock.nowNanos();
         PaddleState state = steppedPlayerAnimations$paddleStates.computeIfAbsent(
                 boat.getUUID(),
                 ignored -> new PaddleState()
         );
-        long elapsed = now - state.lastSampleNanos;
-        if (!state.initialized || elapsed < 0L || elapsed >= steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS) {
+        if (state.gate.shouldCapture(now)) {
             state.capture(leftPaddle, rightPaddle);
-            state.lastSampleNanos = !state.initialized || elapsed < 0L
-                    ? now
-                    : now - elapsed % steppedPlayerAnimations$SAMPLE_INTERVAL_NANOS;
             state.initialized = true;
         } else {
             state.restore(leftPaddle, rightPaddle);
@@ -70,7 +65,7 @@ abstract class BoatPaddleSamplerMixin {
 
     @Unique
     private static final class PaddleState {
-        private long lastSampleNanos;
+        private final SteppedAnimationClock.Gate gate = new SteppedAnimationClock.Gate();
         private boolean initialized;
         private float leftXRot;
         private float leftYRot;
