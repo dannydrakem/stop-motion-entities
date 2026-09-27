@@ -27,7 +27,7 @@ import java.util.WeakHashMap;
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartWithState", remap = false)
 abstract class EmfFinalPoseSamplerMixin {
-    private static final Map<Object, ExpiringStateCache<SampleKey, SampleState>> SAMPLES = new WeakHashMap<>();
+    private static final Map<Object, ContextSamples> SAMPLES = new WeakHashMap<>();
     private static final Map<Object, List<ModelPart>> ROOT_PARTS = new WeakHashMap<>();
     private static Method getRoot;
     private static Field modelName;
@@ -158,12 +158,12 @@ abstract class EmfFinalPoseSamplerMixin {
             long renderSequence,
             long now
     ) {
-        ExpiringStateCache<SampleKey, SampleState> byContext = SAMPLES.computeIfAbsent(
+        ContextSamples byContext = SAMPLES.computeIfAbsent(
                 rootIdentity,
-                ignored -> new ExpiringStateCache<>()
+                ignored -> new ContextSamples()
         );
-        SampleState state = byContext.getOrCreate(
-                new SampleKey(entityId, handRender, SteppedRenderContext.isInventory()),
+        SampleState state = byContext.cache(handRender, SteppedRenderContext.isInventory()).getOrCreate(
+                entityId,
                 SampleState::new
         );
         if (state.lastRenderSequence == renderSequence) {
@@ -248,7 +248,18 @@ abstract class EmfFinalPoseSamplerMixin {
         );
     }
 
-    private record SampleKey(UUID entityId, boolean handRender, boolean inventoryRender) {
+    private static final class ContextSamples {
+        private final ExpiringStateCache<UUID, SampleState> world = new ExpiringStateCache<>();
+        private final ExpiringStateCache<UUID, SampleState> inventory = new ExpiringStateCache<>();
+        private final ExpiringStateCache<UUID, SampleState> hand = new ExpiringStateCache<>();
+        private final ExpiringStateCache<UUID, SampleState> inventoryHand = new ExpiringStateCache<>();
+
+        private ExpiringStateCache<UUID, SampleState> cache(boolean handRender, boolean inventoryRender) {
+            if (handRender) {
+                return inventoryRender ? inventoryHand : hand;
+            }
+            return inventoryRender ? inventory : world;
+        }
     }
 
     private static final class SampleState {

@@ -34,7 +34,7 @@ import java.util.WeakHashMap;
 @Mixin(LivingEntityRenderer.class)
 abstract class VanillaLivingEntityPoseSamplerMixin {
     @Unique
-    private static final Map<EntityModel<?>, ExpiringStateCache<SampleKey, SampleState>>
+    private static final Map<EntityModel<?>, ContextSamples>
             steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
     @Unique
     private static final Map<EntityModel<?>, ModelTopology> steppedPlayerAnimations$TOPOLOGIES = new WeakHashMap<>();
@@ -110,12 +110,12 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         }
 
         String modelName = model.getClass().getSimpleName();
-        ExpiringStateCache<SampleKey, SampleState> byContext = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
+        ContextSamples byContext = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
                 model,
-                ignored -> new ExpiringStateCache<>()
+                ignored -> new ContextSamples()
         );
-        SampleState state = byContext.getOrCreate(
-                new SampleKey(entity.getUUID(), SteppedRenderContext.isInventory()),
+        SampleState state = byContext.cache(SteppedRenderContext.isInventory()).getOrCreate(
+                entity.getUUID(),
                 SampleState::new
         );
         long now = SteppedAnimationClock.nowNanos();
@@ -215,7 +215,14 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         private PoseSnapshot snapshot;
     }
 
-    private record SampleKey(UUID entityId, boolean inventoryRender) {
+    @Unique
+    private static final class ContextSamples {
+        private final ExpiringStateCache<UUID, SampleState> world = new ExpiringStateCache<>();
+        private final ExpiringStateCache<UUID, SampleState> inventory = new ExpiringStateCache<>();
+
+        private ExpiringStateCache<UUID, SampleState> cache(boolean inventoryRender) {
+            return inventoryRender ? inventory : world;
+        }
     }
 
     @Unique
