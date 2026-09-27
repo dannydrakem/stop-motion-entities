@@ -20,11 +20,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Collections;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -56,6 +59,8 @@ abstract class EmfBendyBridgeMixin {
     );
     private static final Set<ModelPart> INITIALIZED_PARTS =
             Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Map<ModelPart, Boolean> LIVE_HEAD_BRANCH_CACHE =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private static final Map<String, String> BEND_SOURCES = Map.of(
             "body", "torso",
@@ -76,8 +81,7 @@ abstract class EmfBendyBridgeMixin {
     private static Field entitiesPausedParts;
     private static Field customPartId;
     private static boolean reflectionFailed;
-    private static boolean loggedJustExpressionsFace;
-    private static boolean loggedPlayerHeadHierarchy;
+    private static final Set<String> LOGGED_LIVE_HEAD_BRANCHES = new LinkedHashSet<>();
     private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
 
@@ -186,10 +190,6 @@ abstract class EmfBendyBridgeMixin {
 
         Set<ModelPart> pausedParts = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<String> controlledGroups = new LinkedHashSet<>();
-        if (!loggedPlayerHeadHierarchy) {
-            loggedPlayerHeadHierarchy = true;
-            steppedPlayerAnimations$dumpPlayerHeadHierarchy(vanillaParts);
-        }
         for (String group : BLEND_GROUPS) {
             boolean controlled = ANIMATION_SOURCES.get(group).stream()
                     .anyMatch(source -> steppedPlayerAnimations$isControlled(animation, source));
@@ -206,26 +206,32 @@ abstract class EmfBendyBridgeMixin {
 
                 pausedParts.add(modelPart);
                 Object[] customChildren = (Object[]) getAllCustomChildren.invoke(vanillaPart);
-                Set<ModelPart> liveFaceParts = Collections.newSetFromMap(new IdentityHashMap<>());
+                Set<ModelPart> liveHeadAnimationParts = Collections.newSetFromMap(new IdentityHashMap<>());
+                Set<String> liveHeadBranchIds = new LinkedHashSet<>();
                 if (group.equals("head")) {
                     for (Object customChild : customChildren) {
-                        if (steppedPlayerAnimations$isJustExpressionsFace(customChild)) {
-                            ((ModelPart) customChild).getAllParts().forEach(liveFaceParts::add);
+                        if (steppedPlayerAnimations$isIndependentHeadAnimationBranch(customChild)) {
+                            ModelPart branch = (ModelPart) customChild;
+                            branch.getAllParts().forEach(liveHeadAnimationParts::add);
+                            liveHeadBranchIds.add(steppedPlayerAnimations$getNormalizedPartId(customChild));
                         }
                     }
                 }
                 for (Object customChild : customChildren) {
                     for (ModelPart descendant : ((ModelPart) customChild).getAllParts().toList()) {
-                        if (!liveFaceParts.contains(descendant)) {
+                        if (!liveHeadAnimationParts.contains(descendant)) {
                             pausedParts.add(descendant);
                         }
                     }
                 }
-                if (!liveFaceParts.isEmpty() && !loggedJustExpressionsFace) {
-                    loggedJustExpressionsFace = true;
+                for (String branchId : liveHeadBranchIds) {
+                    if (!LOGGED_LIVE_HEAD_BRANCHES.add(branchId)) {
+                        continue;
+                    }
                     SteppedPlayerAnimationsClient.LOGGER.info(
-                            "Just Expressions face branch detected; keeping all {} player_face parts animated during Emotecraft.",
-                            liveFaceParts.size()
+                            "Independent EMF head animation branch '{}' detected; keeping its internal animations live during Emotecraft ({} live head parts total).",
+                            branchId,
+                            liveHeadAnimationParts.size()
                     );
                 }
             }
@@ -247,112 +253,111 @@ abstract class EmfBendyBridgeMixin {
         }
     }
 
-    private static boolean steppedPlayerAnimations$isJustExpressionsFace(Object customChild)
+    private static boolean steppedPlayerAnimations$isIndependentHeadAnimationBranch(Object customChild)
             throws IllegalAccessException {
-        String id = steppedPlayerAnimations$normalizeEmfId(
-                String.valueOf(customPartId.get(customChild))
-        );
-        if ("player_face".equals(id)) {
+        ModelPart root = (ModelPart) customChild;
+        Boolean cached = LIVE_HEAD_BRANCH_CACHE.get(root);
+        if (cached != null) {
+            return cached;
+        }
+
+        String id = steppedPlayerAnimations$getNormalizedPartId(customChild);
+        if (steppedPlayerAnimations$isFacialBranchName(id)) {
+            LIVE_HEAD_BRANCH_CACHE.put(root, true);
             return true;
         }
 
-        // EMF may rename the imported JPM root when its ID collides with an existing child.
-        // The actual Just Expressions root has a stable structural signature even in that case:
-        // its direct children contain the eyes and brows groups (and normally extras as well).
-        Map<String, ModelPart> children =
-                ((ModelPartChildrenAccessor) customChild).steppedPlayerAnimations$children();
-        Set<String> normalizedChildNames = new LinkedHashSet<>();
-        for (String childName : children.keySet()) {
-            normalizedChildNames.add(steppedPlayerAnimations$normalizeEmfId(childName));
+        // Packs arrange facial animation very differently. Just Expressions imports a
+        // player_face JPM, while Expressive Fresh Moves embeds the same kind of facial
+        // rig inside its custom head. Recognize the rig by semantic structure instead
+        // of a pack-specific root ID, including nested layouts used by other EMF packs.
+        boolean hasEye = false;
+        boolean hasBrow = false;
+        boolean hasEyeDetail = false;
+        boolean hasMouth = false;
+
+        Set<ModelPart> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<ModelPart> remaining = new ArrayDeque<>();
+        remaining.add(root);
+        int inspected = 0;
+        while (!remaining.isEmpty() && inspected < 1024) {
+            ModelPart part = remaining.removeFirst();
+            if (!visited.add(part)) {
+                continue;
+            }
+            inspected++;
+
+            if (customPartId.getDeclaringClass().isInstance(part)) {
+                String partId = steppedPlayerAnimations$getNormalizedPartId(part);
+                hasEye |= steppedPlayerAnimations$isEyeName(partId);
+                hasBrow |= steppedPlayerAnimations$isBrowName(partId);
+                hasEyeDetail |= steppedPlayerAnimations$isEyeDetailName(partId);
+                hasMouth |= steppedPlayerAnimations$isMouthName(partId);
+            }
+
+            Map<String, ModelPart> children =
+                    ((ModelPartChildrenAccessor) (Object) part).steppedPlayerAnimations$children();
+            for (Map.Entry<String, ModelPart> child : children.entrySet()) {
+                String childName = steppedPlayerAnimations$normalizeEmfId(child.getKey());
+                hasEye |= steppedPlayerAnimations$isEyeName(childName);
+                hasBrow |= steppedPlayerAnimations$isBrowName(childName);
+                hasEyeDetail |= steppedPlayerAnimations$isEyeDetailName(childName);
+                hasMouth |= steppedPlayerAnimations$isMouthName(childName);
+                remaining.addLast(child.getValue());
+            }
         }
-        return normalizedChildNames.contains("eyes") && normalizedChildNames.contains("brows");
+        boolean result = hasEye && (hasBrow || hasEyeDetail || hasMouth);
+        LIVE_HEAD_BRANCH_CACHE.put(root, result);
+        return result;
+    }
+
+    private static String steppedPlayerAnimations$getNormalizedPartId(Object part)
+            throws IllegalAccessException {
+        return steppedPlayerAnimations$normalizeEmfId(String.valueOf(customPartId.get(part)));
+    }
+
+    private static boolean steppedPlayerAnimations$isFacialBranchName(String name) {
+        return name.equals("player_face")
+                || name.equals("face")
+                || name.equals("eyes")
+                || name.equals("brows")
+                || name.equals("eyelids")
+                || name.equals("eyelashes")
+                || name.equals("mouth");
+    }
+
+    private static boolean steppedPlayerAnimations$isEyeName(String name) {
+        return name.equals("eye")
+                || name.equals("eyes")
+                || name.contains("_eye")
+                || name.contains("eye_")
+                || name.contains("eyelid")
+                || name.contains("eyelash")
+                || name.contains("pupil")
+                || name.contains("blink");
+    }
+
+    private static boolean steppedPlayerAnimations$isBrowName(String name) {
+        return name.contains("brow");
+    }
+
+    private static boolean steppedPlayerAnimations$isEyeDetailName(String name) {
+        return name.contains("eyelid")
+                || name.contains("eyelash")
+                || name.contains("pupil")
+                || name.contains("blink");
+    }
+
+    private static boolean steppedPlayerAnimations$isMouthName(String name) {
+        return name.contains("mouth") || name.contains("lip");
     }
 
     private static String steppedPlayerAnimations$normalizeEmfId(String id) {
-        String normalized = id;
-        while (normalized.startsWith("EMF_")) {
-            normalized = normalized.substring(4);
+        String normalized = id.toLowerCase(Locale.ROOT);
+        while (normalized.startsWith("emf_")) {
+            normalized = normalized.substring(4).toLowerCase(Locale.ROOT);
         }
         return normalized;
-    }
-
-    private static void steppedPlayerAnimations$dumpPlayerHeadHierarchy(Map<String, Object> vanillaParts)
-            throws IllegalAccessException {
-        StringBuilder dump = new StringBuilder(8192);
-        dump.append("Runtime EMF player head hierarchy (diagnostic stage 22.1).\n")
-                .append("Available vanilla-part keys: ")
-                .append(vanillaParts.keySet())
-                .append('\n');
-
-        Set<ModelPart> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-        int[] remaining = {512};
-        for (String rootName : List.of("head", "hat")) {
-            Object root = vanillaParts.get(rootName);
-            if (root instanceof ModelPart modelPart) {
-                steppedPlayerAnimations$appendPartHierarchy(
-                        dump,
-                        rootName,
-                        modelPart,
-                        0,
-                        visited,
-                        remaining
-                );
-            } else {
-                dump.append(rootName).append(" = <missing>\n");
-            }
-        }
-        if (remaining[0] == 0) {
-            dump.append("<diagnostic truncated after 512 unique parts>\n");
-        }
-
-        SteppedPlayerAnimationsClient.LOGGER.info("{}", dump);
-    }
-
-    private static void steppedPlayerAnimations$appendPartHierarchy(
-            StringBuilder dump,
-            String path,
-            ModelPart part,
-            int depth,
-            Set<ModelPart> visited,
-            int[] remaining
-    ) throws IllegalAccessException {
-        if (remaining[0] <= 0 || depth > 24) {
-            return;
-        }
-
-        String internalId = "-";
-        if (customPartId.getDeclaringClass().isInstance(part)) {
-            Object value = customPartId.get(part);
-            internalId = String.valueOf(value);
-        }
-        dump.append("  ".repeat(depth))
-                .append(path)
-                .append(" | class=")
-                .append(part.getClass().getName())
-                .append(" | id=")
-                .append(internalId)
-                .append(" | identity=")
-                .append(Integer.toHexString(System.identityHashCode(part)))
-                .append('\n');
-
-        if (!visited.add(part)) {
-            dump.append("  ".repeat(depth + 1)).append("<already visited>\n");
-            return;
-        }
-        remaining[0]--;
-
-        Map<String, ModelPart> children =
-                ((ModelPartChildrenAccessor) (Object) part).steppedPlayerAnimations$children();
-        for (Map.Entry<String, ModelPart> child : children.entrySet()) {
-            steppedPlayerAnimations$appendPartHierarchy(
-                    dump,
-                    path + "/" + child.getKey(),
-                    child.getValue(),
-                    depth + 1,
-                    visited,
-                    remaining
-            );
-        }
     }
 
     private static boolean steppedPlayerAnimations$isControlled(AnimationApplier animation, String partName) {
