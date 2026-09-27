@@ -3,6 +3,7 @@ package dev.steppedplayeranimations.mixin.vanilla;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.AgeableListModel;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.ListModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -104,6 +105,14 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         Set<ModelPart> uniqueParts = Collections.newSetFromMap(new IdentityHashMap<>());
         if (entityModel instanceof HierarchicalModel<?> hierarchicalModel) {
             hierarchicalModel.root().getAllParts().forEach(uniqueParts::add);
+        } else if (entityModel instanceof AgeableListModel<?> ageableListModel) {
+            AgeableListModelAccessor accessor = (AgeableListModelAccessor) ageableListModel;
+            accessor.steppedPlayerAnimations$headParts().forEach(
+                    root -> root.getAllParts().forEach(uniqueParts::add)
+            );
+            accessor.steppedPlayerAnimations$bodyParts().forEach(
+                    root -> root.getAllParts().forEach(uniqueParts::add)
+            );
         } else if (entityModel instanceof ListModel<?> listModel) {
             for (ModelPart root : listModel.parts()) {
                 root.getAllParts().forEach(uniqueParts::add);

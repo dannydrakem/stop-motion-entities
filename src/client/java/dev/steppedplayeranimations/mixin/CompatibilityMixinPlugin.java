@@ -29,7 +29,8 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         FabricLoader loader = FabricLoader.getInstance();
-        if (mixinClassName.endsWith("VanillaLivingEntityPoseSamplerMixin")
+        if (mixinClassName.endsWith("AgeableListModelAccessor")
+                || mixinClassName.endsWith("VanillaLivingEntityPoseSamplerMixin")
                 || mixinClassName.endsWith("BoatPaddleSamplerMixin")
                 || mixinClassName.endsWith("MinecartWobbleSamplerMixin")) {
             LOGGER.info("Applying standalone animation Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
