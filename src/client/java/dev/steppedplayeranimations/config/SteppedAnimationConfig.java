@@ -4,6 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +15,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class SteppedAnimationConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -20,6 +26,7 @@ public final class SteppedAnimationConfig {
 
     private static boolean enabled = true;
     private static FrameRate frameRate = FrameRate.FPS_12;
+    private static Set<String> disabledEntityTypes = new HashSet<>();
     private static long revision;
 
     private SteppedAnimationConfig() {
@@ -36,6 +43,10 @@ public final class SteppedAnimationConfig {
             if (loaded != null) {
                 enabled = loaded.enabled;
                 frameRate = loaded.frameRate == null ? FrameRate.FPS_12 : loaded.frameRate;
+                disabledEntityTypes = loaded.disabledEntityTypes == null
+                        ? new HashSet<>()
+                        : new HashSet<>(loaded.disabledEntityTypes);
+                disabledEntityTypes.removeIf(entityId -> entityId == null || entityId.isBlank());
                 normalizeState();
             }
             revision++;
@@ -66,6 +77,30 @@ public final class SteppedAnimationConfig {
 
     public static long revision() {
         return revision;
+    }
+
+    public static boolean isEntityEnabled(Entity entity) {
+        return entity != null && isEntityTypeEnabled(entity.getType());
+    }
+
+    public static boolean isEntityTypeEnabled(EntityType<?> entityType) {
+        ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+        return entityId == null || !disabledEntityTypes.contains(entityId.toString());
+    }
+
+    public static void setEntityTypeEnabled(EntityType<?> entityType, boolean entityEnabled) {
+        ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+        if (entityId == null) {
+            return;
+        }
+
+        boolean changed = entityEnabled
+                ? disabledEntityTypes.remove(entityId.toString())
+                : disabledEntityTypes.add(entityId.toString());
+        if (changed) {
+            revision++;
+            save();
+        }
     }
 
     public static void toggleEnabled() {
@@ -118,6 +153,7 @@ public final class SteppedAnimationConfig {
         ConfigData data = new ConfigData();
         data.enabled = enabled;
         data.frameRate = frameRate;
+        data.disabledEntityTypes = new HashSet<>(disabledEntityTypes);
         Path temporaryPath = CONFIG_PATH.resolveSibling(CONFIG_PATH.getFileName() + ".tmp");
         try {
             Files.createDirectories(CONFIG_PATH.getParent());
@@ -171,5 +207,6 @@ public final class SteppedAnimationConfig {
     private static final class ConfigData {
         private boolean enabled = true;
         private FrameRate frameRate = FrameRate.FPS_12;
+        private Set<String> disabledEntityTypes = new HashSet<>();
     }
 }

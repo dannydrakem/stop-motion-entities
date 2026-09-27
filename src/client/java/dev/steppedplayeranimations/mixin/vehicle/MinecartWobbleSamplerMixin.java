@@ -67,7 +67,7 @@ abstract class MinecartWobbleSamplerMixin {
             return angle;
         }
         AbstractMinecart minecart = steppedPlayerAnimations$currentMinecart;
-        if (minecart == null) {
+        if (minecart == null || !SteppedAnimationConfig.isEntityEnabled(minecart)) {
             return angle;
         }
 

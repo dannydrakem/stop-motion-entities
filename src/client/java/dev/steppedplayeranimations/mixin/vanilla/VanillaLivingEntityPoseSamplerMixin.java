@@ -62,7 +62,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             CallbackInfo callback
     ) {
         steppedPlayerAnimations$poseBeforeRender = null;
-        if (!SteppedAnimationConfig.isSteppingActive()) {
+        if (!SteppedAnimationConfig.isSteppingActive() || !SteppedAnimationConfig.isEntityEnabled(entity)) {
             return;
         }
 
@@ -89,7 +89,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             int packedLight,
             CallbackInfo callback
     ) {
-        if (!SteppedAnimationConfig.isSteppingActive()) {
+        if (!SteppedAnimationConfig.isSteppingActive() || !SteppedAnimationConfig.isEntityEnabled(entity)) {
             return;
         }
         List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);

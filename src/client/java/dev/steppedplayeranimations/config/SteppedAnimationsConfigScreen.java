@@ -42,9 +42,18 @@ public final class SteppedAnimationsConfigScreen extends Screen {
                 .build());
 
         addRenderableWidget(Button.builder(
+                Component.translatable("option.stepped_player_animations.entities"),
+                button -> {
+                    if (minecraft != null) {
+                        minecraft.setScreen(new EntityTypeConfigScreen(this));
+                    }
+                }
+        ).bounds(left, top + 48, 200, 20).build());
+
+        addRenderableWidget(Button.builder(
                 Component.translatable("gui.done"),
                 button -> onClose()
-        ).bounds(left, top + 64, 200, 20).build());
+        ).bounds(left, top + 80, 200, 20).build());
     }
 
     @Override

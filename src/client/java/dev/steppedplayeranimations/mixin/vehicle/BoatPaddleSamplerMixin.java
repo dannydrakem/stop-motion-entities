@@ -45,7 +45,7 @@ abstract class BoatPaddleSamplerMixin {
             float headPitch,
             CallbackInfo callback
     ) {
-        if (!SteppedAnimationConfig.isSteppingActive()) {
+        if (!SteppedAnimationConfig.isSteppingActive() || !SteppedAnimationConfig.isEntityEnabled(boat)) {
             return;
         }
         long now = SteppedAnimationClock.nowNanos();

@@ -57,6 +57,10 @@ abstract class EmfFinalPoseSamplerMixin {
 
         try {
             steppedPlayerAnimations$initializeReflection();
+            Object currentEntity = getCurrentEntity.invoke(null);
+            if (currentEntity instanceof Entity entity && !SteppedAnimationConfig.isEntityEnabled(entity)) {
+                return;
+            }
             Object root = getRoot.invoke(this);
             if (root == this) {
                 steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(
@@ -92,6 +96,9 @@ abstract class EmfFinalPoseSamplerMixin {
             steppedPlayerAnimations$initializeReflection();
             Object currentEntity = getCurrentEntity.invoke(null);
             if (!(currentEntity instanceof Entity entity)) {
+                return;
+            }
+            if (!SteppedAnimationConfig.isEntityEnabled(entity)) {
                 return;
             }
 
