@@ -21,7 +21,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(HumanoidArmorLayer.class)
 abstract class PlayerAnimatorArmorBridgeMixin {
+    private static final Pair<Float, Float> steppedPlayerAnimations$ZERO_BEND =
+            new Pair<>(0.0F, 0.0F);
     private static boolean steppedPlayerAnimations$loggedActiveBridge;
+    private static boolean steppedPlayerAnimations$loggedReset;
 
     @Inject(
             method = "renderArmorPiece",
@@ -44,27 +47,47 @@ abstract class PlayerAnimatorArmorBridgeMixin {
         }
 
         AnimationApplier animation = animatedPlayer.playerAnimator_getAnimation();
-        if (animation == null || !animation.isActive()) {
-            return;
-        }
+        boolean active = animation != null && animation.isActive();
 
         // EMF replacement player models do not reliably propagate PlayerAnimator's supplier to
         // vanilla armor models. The regular copyPropertiesTo call above already copied the held
         // rotations; only the bend state and the torso render supplier must be restored here.
+        // The armor models are reused between frames, so an inactive animation must explicitly
+        // clear both values instead of leaving the last emote bend stored in BendyLib.
         SetableSupplier<AnimationProcessor> supplier = new SetableSupplier<>();
-        supplier.set(animation);
+        supplier.set(active ? animation : null);
         ((IMutableModel) armorModel).setEmoteSupplier(supplier);
 
-        IBendHelper.INSTANCE.bend(armorModel.body, steppedPlayerAnimations$torsoBend(animation));
-        IBendHelper.INSTANCE.bend(armorModel.rightArm, animation.getBend("rightArm"));
-        IBendHelper.INSTANCE.bend(armorModel.leftArm, animation.getBend("leftArm"));
-        IBendHelper.INSTANCE.bend(armorModel.rightLeg, animation.getBend("rightLeg"));
-        IBendHelper.INSTANCE.bend(armorModel.leftLeg, animation.getBend("leftLeg"));
+        IBendHelper.INSTANCE.bend(
+                armorModel.body,
+                active ? steppedPlayerAnimations$torsoBend(animation) : steppedPlayerAnimations$ZERO_BEND
+        );
+        IBendHelper.INSTANCE.bend(
+                armorModel.rightArm,
+                active ? animation.getBend("rightArm") : steppedPlayerAnimations$ZERO_BEND
+        );
+        IBendHelper.INSTANCE.bend(
+                armorModel.leftArm,
+                active ? animation.getBend("leftArm") : steppedPlayerAnimations$ZERO_BEND
+        );
+        IBendHelper.INSTANCE.bend(
+                armorModel.rightLeg,
+                active ? animation.getBend("rightLeg") : steppedPlayerAnimations$ZERO_BEND
+        );
+        IBendHelper.INSTANCE.bend(
+                armorModel.leftLeg,
+                active ? animation.getBend("leftLeg") : steppedPlayerAnimations$ZERO_BEND
+        );
 
-        if (!steppedPlayerAnimations$loggedActiveBridge) {
+        if (active && !steppedPlayerAnimations$loggedActiveBridge) {
             steppedPlayerAnimations$loggedActiveBridge = true;
             SteppedPlayerAnimationsClient.LOGGER.info(
                     "Forwarding PlayerAnimator limb and torso bends to humanoid armor layers."
+            );
+        } else if (!active && steppedPlayerAnimations$loggedActiveBridge && !steppedPlayerAnimations$loggedReset) {
+            steppedPlayerAnimations$loggedReset = true;
+            SteppedPlayerAnimationsClient.LOGGER.info(
+                    "Cleared the retained PlayerAnimator bends from humanoid armor layers."
             );
         }
     }
