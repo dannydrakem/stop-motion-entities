@@ -1,0 +1,13 @@
+{
+  "key.category.stepped_player_animations": "Stepped Animations",
+  "key.stepped_player_animations.toggle": "Toggle animation limiting",
+  "key.stepped_player_animations.cycle_frame_rate": "Cycle animation frame rate",
+  "message.stepped_player_animations.enabled": "Stepped animations: %s",
+  "message.stepped_player_animations.frame_rate": "Animation frame rate: %s",
+  "screen.stepped_player_animations.title": "Stepped Animations",
+  "screen.stepped_player_animations.description": "Global settings for all supported entities",
+  "option.stepped_player_animations.enabled": "Animation limiting: %s",
+  "option.stepped_player_animations.frame_rate": "Frame rate: %s",
+  "option.stepped_player_animations.fps": "%s FPS",
+  "option.stepped_player_animations.unlimited": "Unlimited"
+}

@@ -3,6 +3,7 @@ package dev.steppedplayeranimations.mixin.emf;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.Entity;
@@ -52,7 +53,7 @@ abstract class EmfFinalPoseSamplerMixin {
             int color,
             CallbackInfo callback
     ) {
-        if (reflectionFailed) {
+        if (reflectionFailed || !SteppedAnimationConfig.isSteppingActive()) {
             return;
         }
 
@@ -83,7 +84,7 @@ abstract class EmfFinalPoseSamplerMixin {
         } catch (ReflectiveOperationException | ClassCastException exception) {
             reflectionFailed = true;
             SteppedPlayerAnimationsClient.LOGGER.error(
-                    "Could not sample the final EMF entity pose; disabling the 12 FPS sampler.",
+                    "Could not sample the final EMF entity pose; disabling the stepped-animation sampler.",
                     exception
             );
         }
@@ -106,20 +107,25 @@ abstract class EmfFinalPoseSamplerMixin {
 
         List<ModelPart> parts = root.getAllParts().toList();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
-        boolean sampleDue = state.gate.shouldCapture(now);
+        long intervalNanos = SteppedAnimationConfig.sampleIntervalNanos();
+        boolean sampleDue = state.gate.shouldCapture(now, intervalNanos, SteppedAnimationConfig.revision());
         if (topologyChanged || sampleDue) {
             state.snapshot = PoseSnapshot.capture(parts);
             if (LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
-                        "12 FPS final-pose sampling active: model={}, entity={}, parts={}, interval={} ns.",
-                        modelName, entityId, parts.size(), SteppedAnimationClock.SAMPLE_INTERVAL_NANOS
+                        "Stepped final-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
+                        SteppedAnimationConfig.frameRate().framesPerSecond(),
+                        modelName,
+                        entityId,
+                        parts.size(),
+                        intervalNanos
                 );
             }
         } else {
             state.snapshot.restore();
             if (LOGGED_HOLD_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
-                        "12 FPS final-pose hold confirmed between samples: model={}, entity={}, parts={}.",
+                        "Stepped final-pose hold confirmed between samples: model={}, entity={}, parts={}.",
                         modelName, entityId, parts.size()
                 );
             }

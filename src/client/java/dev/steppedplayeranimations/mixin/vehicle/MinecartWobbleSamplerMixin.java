@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.mixin.vehicle;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.MinecartRenderer;
@@ -62,6 +63,9 @@ abstract class MinecartWobbleSamplerMixin {
             index = 0
     )
     private float steppedPlayerAnimations$sampleHitWobble(float angle) {
+        if (!SteppedAnimationConfig.isSteppingActive()) {
+            return angle;
+        }
         AbstractMinecart minecart = steppedPlayerAnimations$currentMinecart;
         if (minecart == null) {
             return angle;
@@ -72,13 +76,18 @@ abstract class MinecartWobbleSamplerMixin {
                 minecart.getUUID(),
                 ignored -> new WobbleState()
         );
-        if (state.gate.shouldCapture(now)) {
+        if (state.gate.shouldCapture(
+                now,
+                SteppedAnimationConfig.sampleIntervalNanos(),
+                SteppedAnimationConfig.revision()
+        )) {
             state.angle = angle;
             state.initialized = true;
         } else if (!steppedPlayerAnimations$logged && Math.abs(angle) >= 0.0001F) {
             steppedPlayerAnimations$logged = true;
             SteppedPlayerAnimationsClient.LOGGER.info(
-                    "12 FPS minecart hit-wobble hold active; rail movement and orientation remain smooth."
+                    "Stepped minecart hit-wobble hold active at {} FPS; rail movement and orientation remain smooth.",
+                    SteppedAnimationConfig.frameRate().framesPerSecond()
             );
         }
         return state.angle;

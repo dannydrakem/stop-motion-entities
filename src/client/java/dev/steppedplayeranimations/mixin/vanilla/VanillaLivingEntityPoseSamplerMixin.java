@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.mixin.vanilla;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.AgeableListModel;
@@ -60,6 +61,9 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             int packedLight,
             CallbackInfo callback
     ) {
+        if (!SteppedAnimationConfig.isSteppingActive()) {
+            return;
+        }
         List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);
         if (parts.isEmpty() || steppedPlayerAnimations$isEmfBacked(parts)) {
             return;
@@ -73,23 +77,25 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         SampleState state = byEntity.computeIfAbsent(entity.getUUID(), ignored -> new SampleState());
         long now = SteppedAnimationClock.nowNanos();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
-        boolean sampleDue = state.gate.shouldCapture(now);
+        long intervalNanos = SteppedAnimationConfig.sampleIntervalNanos();
+        boolean sampleDue = state.gate.shouldCapture(now, intervalNanos, SteppedAnimationConfig.revision());
         if (topologyChanged || sampleDue) {
             state.snapshot = PoseSnapshot.capture(parts);
             if (steppedPlayerAnimations$LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
-                        "12 FPS vanilla-pose sampling active: model={}, entity={}, parts={}, interval={} ns.",
+                        "Stepped vanilla-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
+                        SteppedAnimationConfig.frameRate().framesPerSecond(),
                         modelName,
                         entity.getUUID(),
                         parts.size(),
-                        SteppedAnimationClock.SAMPLE_INTERVAL_NANOS
+                        intervalNanos
                 );
             }
         } else {
             state.snapshot.restore();
             if (steppedPlayerAnimations$LOGGED_HOLD_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
-                        "12 FPS vanilla-pose hold confirmed: model={}, entity={}, parts={}.",
+                        "Stepped vanilla-pose hold confirmed: model={}, entity={}, parts={}.",
                         modelName, entity.getUUID(), parts.size()
                 );
             }
@@ -117,7 +123,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             String modelName = entityModel.getClass().getName();
             if (steppedPlayerAnimations$LOGGED_UNSUPPORTED_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.warn(
-                        "Vanilla 12 FPS sampler cannot enumerate model parts for {}; leaving this model smooth.",
+                        "The vanilla stepped-animation sampler cannot enumerate model parts for {}; leaving this model smooth.",
                         modelName
                 );
             }

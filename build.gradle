@@ -24,6 +24,10 @@ loom {
 repositories {
     mavenCentral()
     maven {
+        name = "TerraformersMC"
+        url = "https://maven.terraformersmc.com/releases/"
+    }
+    maven {
         name = "KosmX"
         url = "https://maven.kosmx.dev/"
     }
@@ -50,6 +54,7 @@ dependencies {
     compileOnly "maven.modrinth:entity-model-features:3.3.9-fabric-1.21"
     modCompileOnly "dev.kosmx.player-anim:player-animation-lib-fabric:2.0.4+1.21.1"
     modCompileOnly "io.github.kosmx.bendy-lib:bendy-lib-fabric:5.1"
+    modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 def modVersion = project.version.toString()

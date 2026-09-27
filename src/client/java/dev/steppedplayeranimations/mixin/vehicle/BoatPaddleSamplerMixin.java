@@ -1,6 +1,7 @@
 package dev.steppedplayeranimations.mixin.vehicle;
 
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
+import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.BoatModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -44,12 +45,19 @@ abstract class BoatPaddleSamplerMixin {
             float headPitch,
             CallbackInfo callback
     ) {
+        if (!SteppedAnimationConfig.isSteppingActive()) {
+            return;
+        }
         long now = SteppedAnimationClock.nowNanos();
         PaddleState state = steppedPlayerAnimations$paddleStates.computeIfAbsent(
                 boat.getUUID(),
                 ignored -> new PaddleState()
         );
-        if (state.gate.shouldCapture(now)) {
+        if (state.gate.shouldCapture(
+                now,
+                SteppedAnimationConfig.sampleIntervalNanos(),
+                SteppedAnimationConfig.revision()
+        )) {
             state.capture(leftPaddle, rightPaddle);
             state.initialized = true;
         } else {
@@ -57,7 +65,8 @@ abstract class BoatPaddleSamplerMixin {
             if (!steppedPlayerAnimations$logged) {
                 steppedPlayerAnimations$logged = true;
                 SteppedPlayerAnimationsClient.LOGGER.info(
-                        "12 FPS boat-paddle hold active; boat movement and hull rocking remain smooth."
+                        "Stepped boat-paddle hold active at {} FPS; boat movement and hull rocking remain smooth.",
+                        SteppedAnimationConfig.frameRate().framesPerSecond()
                 );
             }
         }

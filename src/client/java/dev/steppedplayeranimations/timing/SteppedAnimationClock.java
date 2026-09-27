@@ -7,8 +7,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public final class SteppedAnimationClock {
-    public static final long SAMPLE_INTERVAL_NANOS = 1_000_000_000L / 12L;
-
     private static boolean initialized;
     private static Method flashbackVisualMillis;
     private static boolean flashbackClockFailed;
@@ -46,7 +44,7 @@ public final class SteppedAnimationClock {
             Class<?> flashback = Class.forName("com.moulberry.flashback.Flashback");
             flashbackVisualMillis = flashback.getMethod("getVisualMillis");
             SteppedPlayerAnimationsClient.LOGGER.info(
-                    "Flashback visual timeline detected; 12 FPS samples will follow replay and export time."
+                    "Flashback visual timeline detected; stepped-animation samples will follow replay and export time."
             );
         } catch (ReflectiveOperationException exception) {
             flashbackClockFailed = true;
@@ -60,14 +58,22 @@ public final class SteppedAnimationClock {
     public static final class Gate {
         private long lastObservedNanos = Long.MIN_VALUE;
         private long sampleBucket = Long.MIN_VALUE;
+        private long lastIntervalNanos = Long.MIN_VALUE;
+        private long lastConfigRevision = Long.MIN_VALUE;
 
-        public boolean shouldCapture(long nowNanos) {
-            long newBucket = Math.floorDiv(nowNanos, SAMPLE_INTERVAL_NANOS);
+        public boolean shouldCapture(long nowNanos, long intervalNanos, long configRevision) {
+            if (intervalNanos <= 0L) {
+                throw new IllegalArgumentException("The sample interval must be positive.");
+            }
+            long newBucket = Math.floorDiv(nowNanos, intervalNanos);
             boolean firstSample = lastObservedNanos == Long.MIN_VALUE;
             boolean timelineMovedBackward = !firstSample && nowNanos < lastObservedNanos;
             boolean enteredNewBucket = newBucket != sampleBucket;
+            boolean settingsChanged = intervalNanos != lastIntervalNanos || configRevision != lastConfigRevision;
             lastObservedNanos = nowNanos;
-            if (firstSample || timelineMovedBackward || enteredNewBucket) {
+            lastIntervalNanos = intervalNanos;
+            lastConfigRevision = configRevision;
+            if (firstSample || timelineMovedBackward || enteredNewBucket || settingsChanged) {
                 sampleBucket = newBucket;
                 return true;
             }

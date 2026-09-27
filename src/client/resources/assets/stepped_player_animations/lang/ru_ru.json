@@ -1,0 +1,13 @@
+{
+  "key.category.stepped_player_animations": "Ступенчатая анимация",
+  "key.stepped_player_animations.toggle": "Включить/выключить ограничение анимации",
+  "key.stepped_player_animations.cycle_frame_rate": "Переключить частоту анимации",
+  "message.stepped_player_animations.enabled": "Ступенчатая анимация: %s",
+  "message.stepped_player_animations.frame_rate": "Частота анимации: %s",
+  "screen.stepped_player_animations.title": "Ступенчатая анимация",
+  "screen.stepped_player_animations.description": "Глобальные настройки для всех поддерживаемых сущностей",
+  "option.stepped_player_animations.enabled": "Ограничение анимации: %s",
+  "option.stepped_player_animations.frame_rate": "Частота: %s",
+  "option.stepped_player_animations.fps": "%s FPS",
+  "option.stepped_player_animations.unlimited": "Без ограничений"
+}
