@@ -157,6 +157,14 @@ abstract class EmfFinalPoseSamplerMixin {
                 ignored -> new SampleState()
         );
         if (state.lastRenderSequence == renderSequence) {
+            // EMF can render the same root several times during one entity pass. Villagers, for
+            // example, draw their base, biome and profession textures through the same model.
+            // animate() still runs for every layer, so merely skipping a duplicate sample leaves
+            // the overlay in the newly evaluated pose while the base is held on the sampled pose.
+            // Reapply the held pose for every repeated layer render.
+            if (state.snapshot != null) {
+                state.snapshot.restore();
+            }
             return;
         }
         state.lastRenderSequence = renderSequence;

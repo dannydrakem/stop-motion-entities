@@ -16,7 +16,8 @@
     "emf.EmfBendyCubeRenderMixin",
     "emf.EmfEmotecraftPartialPauseMixin",
     "emf.EmfFinalPoseSamplerMixin",
-    "emf.EmfPlayerAnimatorFallbackMixin"
+    "emf.EmfPlayerAnimatorFallbackMixin",
+    "emf.PlayerAnimatorArmorBridgeMixin"
   ],
   "injectors": {
     "defaultRequire": 1
