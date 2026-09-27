@@ -5,6 +5,7 @@ import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.render.SteppedRenderContext;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
+import dev.steppedplayeranimations.timing.ExpiringStateCache;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.AgeableListModel;
 import net.minecraft.client.model.HierarchicalModel;
@@ -22,7 +23,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,7 +34,10 @@ import java.util.WeakHashMap;
 @Mixin(LivingEntityRenderer.class)
 abstract class VanillaLivingEntityPoseSamplerMixin {
     @Unique
-    private static final Map<EntityModel<?>, Map<SampleKey, SampleState>> steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
+    private static final Map<EntityModel<?>, ExpiringStateCache<SampleKey, SampleState>>
+            steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
+    @Unique
+    private static final Map<EntityModel<?>, ModelTopology> steppedPlayerAnimations$TOPOLOGIES = new WeakHashMap<>();
     @Unique
     private static final Set<String> steppedPlayerAnimations$LOGGED_CAPTURE_MODELS = new LinkedHashSet<>();
     @Unique
@@ -44,6 +47,8 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
 
     @Unique
     private PoseSnapshot steppedPlayerAnimations$poseBeforeRender;
+    @Unique
+    private boolean steppedPlayerAnimations$restorePoseAfterRender;
 
     @Shadow
     protected EntityModel<?> model;
@@ -61,14 +66,20 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             int packedLight,
             CallbackInfo callback
     ) {
-        steppedPlayerAnimations$poseBeforeRender = null;
+        steppedPlayerAnimations$restorePoseAfterRender = false;
         if (!SteppedAnimationConfig.isSteppingActive() || !SteppedAnimationConfig.isEntityEnabled(entity)) {
             return;
         }
 
-        List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);
+        List<ModelPart> parts = steppedPlayerAnimations$topology(model).parts();
         if (!parts.isEmpty()) {
-            steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(parts);
+            if (steppedPlayerAnimations$poseBeforeRender == null
+                    || !steppedPlayerAnimations$poseBeforeRender.matches(parts)) {
+                steppedPlayerAnimations$poseBeforeRender = new PoseSnapshot(parts);
+            } else {
+                steppedPlayerAnimations$poseBeforeRender.capture();
+            }
+            steppedPlayerAnimations$restorePoseAfterRender = true;
         }
     }
 
@@ -92,26 +103,31 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         if (!SteppedAnimationConfig.isSteppingActive() || !SteppedAnimationConfig.isEntityEnabled(entity)) {
             return;
         }
-        List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);
-        if (parts.isEmpty() || steppedPlayerAnimations$isEmfBacked(parts)) {
+        ModelTopology topology = steppedPlayerAnimations$topology(model);
+        List<ModelPart> parts = topology.parts();
+        if (parts.isEmpty() || topology.emfBacked()) {
             return;
         }
 
         String modelName = model.getClass().getSimpleName();
-        Map<SampleKey, SampleState> byContext = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
+        ExpiringStateCache<SampleKey, SampleState> byContext = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
                 model,
-                ignored -> new HashMap<>()
+                ignored -> new ExpiringStateCache<>()
         );
-        SampleState state = byContext.computeIfAbsent(
+        SampleState state = byContext.getOrCreate(
                 new SampleKey(entity.getUUID(), SteppedRenderContext.isInventory()),
-                ignored -> new SampleState()
+                SampleState::new
         );
         long now = SteppedAnimationClock.nowNanos();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
         long intervalNanos = SteppedAnimationConfig.sampleIntervalNanos();
         boolean sampleDue = state.gate.shouldCapture(now, intervalNanos, SteppedAnimationConfig.revision());
         if (topologyChanged || sampleDue) {
-            state.snapshot = PoseSnapshot.capture(parts);
+            if (topologyChanged) {
+                state.snapshot = new PoseSnapshot(parts);
+            } else {
+                state.snapshot.capture();
+            }
             if (steppedPlayerAnimations$LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "Stepped vanilla-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
@@ -146,14 +162,22 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
             int packedLight,
             CallbackInfo callback
     ) {
-        if (steppedPlayerAnimations$poseBeforeRender != null) {
+        if (steppedPlayerAnimations$restorePoseAfterRender) {
             steppedPlayerAnimations$poseBeforeRender.restore();
-            steppedPlayerAnimations$poseBeforeRender = null;
+            steppedPlayerAnimations$restorePoseAfterRender = false;
         }
     }
 
     @Unique
-    private static List<ModelPart> steppedPlayerAnimations$collectParts(EntityModel<?> entityModel) {
+    private static ModelTopology steppedPlayerAnimations$topology(EntityModel<?> entityModel) {
+        return steppedPlayerAnimations$TOPOLOGIES.computeIfAbsent(
+                entityModel,
+                VanillaLivingEntityPoseSamplerMixin::steppedPlayerAnimations$collectTopology
+        );
+    }
+
+    @Unique
+    private static ModelTopology steppedPlayerAnimations$collectTopology(EntityModel<?> entityModel) {
         Set<ModelPart> uniqueParts = Collections.newSetFromMap(new IdentityHashMap<>());
         if (entityModel instanceof HierarchicalModel<?> hierarchicalModel) {
             hierarchicalModel.root().getAllParts().forEach(uniqueParts::add);
@@ -178,17 +202,11 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
                 );
             }
         }
-        return new ArrayList<>(uniqueParts);
-    }
-
-    @Unique
-    private static boolean steppedPlayerAnimations$isEmfBacked(List<ModelPart> parts) {
-        for (ModelPart part : parts) {
-            if (part.getClass().getName().startsWith("traben.entity_model_features.")) {
-                return true;
-            }
-        }
-        return false;
+        List<ModelPart> parts = List.copyOf(new ArrayList<>(uniqueParts));
+        boolean emfBacked = parts.stream().anyMatch(
+                part -> part.getClass().getName().startsWith("traben.entity_model_features.")
+        );
+        return new ModelTopology(parts, emfBacked);
     }
 
     @Unique
@@ -201,42 +219,71 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
     }
 
     @Unique
-    private record PoseSnapshot(List<PartSnapshot> parts) {
-        private static PoseSnapshot capture(List<ModelPart> modelParts) {
-            return new PoseSnapshot(modelParts.stream().map(PartSnapshot::new).toList());
+    private record ModelTopology(List<ModelPart> parts, boolean emfBacked) {
+    }
+
+    @Unique
+    private static final class PoseSnapshot {
+        private final List<ModelPart> topology;
+        private final PartSnapshot[] parts;
+
+        private PoseSnapshot(List<ModelPart> modelParts) {
+            topology = modelParts;
+            parts = new PartSnapshot[modelParts.size()];
+            for (int index = 0; index < modelParts.size(); index++) {
+                parts[index] = new PartSnapshot(modelParts.get(index));
+            }
         }
 
         private boolean matches(List<ModelPart> modelParts) {
-            if (parts.size() != modelParts.size()) {
+            if (topology == modelParts) {
+                return true;
+            }
+            if (parts.length != modelParts.size()) {
                 return false;
             }
-            Set<ModelPart> expected = Collections.newSetFromMap(new IdentityHashMap<>());
-            parts.forEach(snapshot -> expected.add(snapshot.part));
-            return modelParts.stream().allMatch(expected::contains);
+            for (int index = 0; index < parts.length; index++) {
+                if (parts[index].part != modelParts.get(index)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void capture() {
+            for (PartSnapshot part : parts) {
+                part.capture();
+            }
         }
 
         private void restore() {
-            parts.forEach(PartSnapshot::restore);
+            for (PartSnapshot part : parts) {
+                part.restore();
+            }
         }
     }
 
     @Unique
     private static final class PartSnapshot {
         private final ModelPart part;
-        private final float x;
-        private final float y;
-        private final float z;
-        private final float xRot;
-        private final float yRot;
-        private final float zRot;
-        private final float xScale;
-        private final float yScale;
-        private final float zScale;
-        private final boolean visible;
-        private final boolean skipDraw;
+        private float x;
+        private float y;
+        private float z;
+        private float xRot;
+        private float yRot;
+        private float zRot;
+        private float xScale;
+        private float yScale;
+        private float zScale;
+        private boolean visible;
+        private boolean skipDraw;
 
         private PartSnapshot(ModelPart part) {
             this.part = part;
+            capture();
+        }
+
+        private void capture() {
             this.x = part.x;
             this.y = part.y;
             this.z = part.z;

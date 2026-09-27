@@ -14,6 +14,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.HashMap;
 
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartRoot", remap = false)
@@ -40,6 +42,12 @@ abstract class EmfBendyBridgeMixin {
     private static final Vec3f CONTROL_PROBE = new Vec3f(923.25F, -811.5F, 677.75F);
     private static final List<String> BLEND_GROUPS = List.of(
             "head", "torso", "rightArm", "leftArm", "rightLeg", "leftLeg"
+    );
+    private static final List<TransformType> CONTROL_TRANSFORMS = List.of(
+            TransformType.POSITION,
+            TransformType.ROTATION,
+            TransformType.BEND,
+            TransformType.SCALE
     );
     private static final Map<String, List<String>> ANIMATION_SOURCES = Map.of(
             "head", List.of("head"),
@@ -61,6 +69,7 @@ abstract class EmfBendyBridgeMixin {
             Collections.newSetFromMap(new WeakHashMap<>());
     private static final Map<ModelPart, ModelPart[]> LIVE_HEAD_PARTS_CACHE =
             Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Object, ModelPart[]> VISIBLE_PARTS_CACHE = new WeakHashMap<>();
 
     private static final Map<String, String> BEND_SOURCES = Map.of(
             "body", "torso",
@@ -85,6 +94,11 @@ abstract class EmfBendyBridgeMixin {
     private static final Set<String> LOGGED_EMBEDDED_HEAD_RIGS = new LinkedHashSet<>();
     private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
+
+    @Unique
+    private final Map<Integer, ModelPart[]> steppedPlayerAnimations$pausedPartsCache = new HashMap<>();
+    @Unique
+    private boolean steppedPlayerAnimations$bendsWereApplied;
 
     @Inject(method = "animate", at = @At("HEAD"))
     private void steppedPlayerAnimations$forwardBendsToEmfCubes(CallbackInfo callback) {
@@ -113,6 +127,13 @@ abstract class EmfBendyBridgeMixin {
 
             steppedPlayerAnimations$updatePartialPause(entityId, active, animation, vanillaParts);
 
+            // A shared EMF model must be cleared once after rendering an animated player so the
+            // next entity cannot inherit its bend. Repeating the same zero-bend traversal on every
+            // later idle frame only performs reflection and map lookups without changing output.
+            if (!active && !steppedPlayerAnimations$bendsWereApplied) {
+                return;
+            }
+
             for (Map.Entry<String, String> mapping : BEND_SOURCES.entrySet()) {
                 Object vanillaPart = vanillaParts.get(mapping.getKey());
                 if (vanillaPart == null) {
@@ -130,9 +151,8 @@ abstract class EmfBendyBridgeMixin {
                             mapping.getValue(), bend.getLeft(), bend.getRight()
                     );
                 }
-                Object[] visibleParts = (Object[]) getAllCustomChildren.invoke(vanillaPart);
-                for (Object visiblePartObject : visibleParts) {
-                    ModelPart visiblePart = (ModelPart) visiblePartObject;
+                ModelPart[] visibleParts = steppedPlayerAnimations$getVisibleParts(vanillaPart);
+                for (ModelPart visiblePart : visibleParts) {
                     if (INITIALIZED_PARTS.add(visiblePart)) {
                         // Match PlayerAnimator's own pivot convention: the torso and jacket bend
                         // from their lower end, while limbs and their overlay layers bend from
@@ -145,6 +165,7 @@ abstract class EmfBendyBridgeMixin {
                     IBendHelper.INSTANCE.bend(visiblePart, bend);
                 }
             }
+            steppedPlayerAnimations$bendsWereApplied = active;
         } catch (ReflectiveOperationException | ClassCastException exception) {
             if (entityId != null) {
                 EmfPartBlendState.setManaged(entityId, false);
@@ -156,6 +177,21 @@ abstract class EmfBendyBridgeMixin {
             reflectionFailed = true;
             SteppedPlayerAnimationsClient.LOGGER.error("Could not forward PlayerAnimator bends to EMF model cubes; disabling the bend bridge.", exception);
         }
+    }
+
+    private static ModelPart[] steppedPlayerAnimations$getVisibleParts(Object vanillaPart)
+            throws ReflectiveOperationException {
+        ModelPart[] cached = VISIBLE_PARTS_CACHE.get(vanillaPart);
+        if (cached != null) {
+            return cached;
+        }
+        Object[] reflected = (Object[]) getAllCustomChildren.invoke(vanillaPart);
+        ModelPart[] visibleParts = new ModelPart[reflected.length];
+        for (int index = 0; index < reflected.length; index++) {
+            visibleParts[index] = (ModelPart) reflected[index];
+        }
+        VISIBLE_PARTS_CACHE.put(vanillaPart, visibleParts);
+        return visibleParts;
     }
 
     private static Pair<Float, Float> steppedPlayerAnimations$getBend(
@@ -177,7 +213,7 @@ abstract class EmfBendyBridgeMixin {
         );
     }
 
-    private static void steppedPlayerAnimations$updatePartialPause(
+    private void steppedPlayerAnimations$updatePartialPause(
             UUID entityId,
             boolean active,
             AnimationApplier animation,
@@ -189,58 +225,82 @@ abstract class EmfBendyBridgeMixin {
             return;
         }
 
-        Set<ModelPart> pausedParts = Collections.newSetFromMap(new IdentityHashMap<>());
-        Set<String> controlledGroups = new LinkedHashSet<>();
-        for (String group : BLEND_GROUPS) {
-            boolean controlled = ANIMATION_SOURCES.get(group).stream()
-                    .anyMatch(source -> steppedPlayerAnimations$isControlled(animation, source));
-            if (!controlled) {
-                continue;
+        int controlMask = 0;
+        for (int groupIndex = 0; groupIndex < BLEND_GROUPS.size(); groupIndex++) {
+            String group = BLEND_GROUPS.get(groupIndex);
+            for (String source : ANIMATION_SOURCES.get(group)) {
+                if (steppedPlayerAnimations$isControlled(animation, source)) {
+                    controlMask |= 1 << groupIndex;
+                    break;
+                }
             }
+        }
 
-            controlledGroups.add(group);
-            for (String target : EMF_TARGETS.get(group)) {
-                Object vanillaPart = vanillaParts.get(target);
-                if (!(vanillaPart instanceof ModelPart modelPart)) {
+        ModelPart[] pausedParts = steppedPlayerAnimations$pausedPartsCache.get(controlMask);
+        if (pausedParts == null) {
+            Set<ModelPart> collectedParts = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (int groupIndex = 0; groupIndex < BLEND_GROUPS.size(); groupIndex++) {
+                if ((controlMask & (1 << groupIndex)) == 0) {
                     continue;
                 }
-
-                pausedParts.add(modelPart);
-                Object[] customChildren = (Object[]) getAllCustomChildren.invoke(vanillaPart);
-                Set<ModelPart> liveHeadAnimationParts = Collections.newSetFromMap(new IdentityHashMap<>());
-                if (group.equals("head")) {
-                    for (Object customChild : customChildren) {
-                        steppedPlayerAnimations$collectIndependentHeadAnimationParts(
-                                customChild,
-                                liveHeadAnimationParts
-                        );
+                String group = BLEND_GROUPS.get(groupIndex);
+                for (String target : EMF_TARGETS.get(group)) {
+                    Object vanillaPart = vanillaParts.get(target);
+                    if (!(vanillaPart instanceof ModelPart modelPart)) {
+                        continue;
                     }
-                }
-                for (Object customChild : customChildren) {
-                    for (ModelPart descendant : ((ModelPart) customChild).getAllParts().toList()) {
-                        if (!liveHeadAnimationParts.contains(descendant)) {
-                            pausedParts.add(descendant);
+
+                    collectedParts.add(modelPart);
+                    ModelPart[] customChildren = steppedPlayerAnimations$getVisibleParts(vanillaPart);
+                    Set<ModelPart> liveHeadAnimationParts = Collections.newSetFromMap(new IdentityHashMap<>());
+                    if (group.equals("head")) {
+                        for (ModelPart customChild : customChildren) {
+                            steppedPlayerAnimations$collectIndependentHeadAnimationParts(
+                                    customChild,
+                                    liveHeadAnimationParts
+                            );
                         }
+                    }
+                    for (ModelPart customChild : customChildren) {
+                        customChild.getAllParts().forEach(descendant -> {
+                            if (!liveHeadAnimationParts.contains(descendant)) {
+                                collectedParts.add(descendant);
+                            }
+                        });
                     }
                 }
             }
+            pausedParts = collectedParts.toArray(ModelPart[]::new);
+            steppedPlayerAnimations$pausedPartsCache.put(controlMask, pausedParts);
         }
 
         EmfPartBlendState.setManaged(entityId, true);
         steppedPlayerAnimations$setPausedParts(
                 entityId,
-                pausedParts.isEmpty() ? null : new ArrayList<>(pausedParts).toArray(ModelPart[]::new)
+                pausedParts.length == 0 ? null : pausedParts
         );
 
-        String mask = String.join(", ", controlledGroups);
-        if (!mask.equals(lastLoggedBlendMask)) {
-            lastLoggedBlendMask = mask;
-            SteppedPlayerAnimationsClient.LOGGER.info(
-                    "Partial FA/Emotecraft blend active; Emotecraft controls: [{}]",
-                    mask
-            );
+        if (controlMask != steppedPlayerAnimations$lastLoggedControlMask) {
+            steppedPlayerAnimations$lastLoggedControlMask = controlMask;
+            List<String> controlledGroups = new ArrayList<>();
+            for (int groupIndex = 0; groupIndex < BLEND_GROUPS.size(); groupIndex++) {
+                if ((controlMask & (1 << groupIndex)) != 0) {
+                    controlledGroups.add(BLEND_GROUPS.get(groupIndex));
+                }
+            }
+            String mask = String.join(", ", controlledGroups);
+            if (!mask.equals(lastLoggedBlendMask)) {
+                lastLoggedBlendMask = mask;
+                SteppedPlayerAnimationsClient.LOGGER.info(
+                        "Partial FA/Emotecraft blend active; Emotecraft controls: [{}]",
+                        mask
+                );
+            }
         }
     }
+
+    @Unique
+    private int steppedPlayerAnimations$lastLoggedControlMask = Integer.MIN_VALUE;
 
     private static void steppedPlayerAnimations$collectIndependentHeadAnimationParts(
             Object customChild,
@@ -376,12 +436,7 @@ abstract class EmfBendyBridgeMixin {
     }
 
     private static boolean steppedPlayerAnimations$isControlled(AnimationApplier animation, String partName) {
-        for (TransformType transform : List.of(
-                TransformType.POSITION,
-                TransformType.ROTATION,
-                TransformType.BEND,
-                TransformType.SCALE
-        )) {
+        for (TransformType transform : CONTROL_TRANSFORMS) {
             Vec3f result = animation.get3DTransform(partName, transform, CONTROL_PROBE);
             if (Float.compare(result.getX(), CONTROL_PROBE.getX()) != 0
                     || Float.compare(result.getY(), CONTROL_PROBE.getY()) != 0

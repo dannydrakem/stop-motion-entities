@@ -21,7 +21,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -35,7 +34,14 @@ abstract class EmfBendyCubeRenderMixin {
     private static boolean steppedPlayerAnimations$loggedUvRenderFailure;
     @Unique
     private static final Map<Object, List<steppedPlayerAnimations$FaceUv>>
-            steppedPlayerAnimations$uvLayouts = Collections.synchronizedMap(new WeakHashMap<>());
+            steppedPlayerAnimations$uvLayouts = new WeakHashMap<>();
+    @Unique
+    private static final Map<BendableCuboid, steppedPlayerAnimations$BendyLayout>
+            steppedPlayerAnimations$bendyLayouts = new WeakHashMap<>();
+    @Unique
+    private static final ThreadLocal<steppedPlayerAnimations$RenderScratch>
+            steppedPlayerAnimations$renderScratch =
+            ThreadLocal.withInitial(steppedPlayerAnimations$RenderScratch::new);
     @Unique
     private static Field steppedPlayerAnimations$cubePolygons;
     @Unique
@@ -149,52 +155,85 @@ abstract class EmfBendyCubeRenderMixin {
             steppedPlayerAnimations$uvLayouts.put(emfCube, sourceFaces);
         }
 
+        steppedPlayerAnimations$BendyLayout bendyLayout =
+                steppedPlayerAnimations$bendyLayouts.get(bendyCuboid);
+        if (bendyLayout == null) {
+            bendyLayout = steppedPlayerAnimations$buildBendyLayout(bendyCuboid, sourceFaces);
+            steppedPlayerAnimations$bendyLayouts.put(bendyCuboid, bendyLayout);
+        }
+
+        Matrix4f positionMatrix = pose.pose();
+        Matrix3f normalMatrix = pose.normal();
+        steppedPlayerAnimations$RenderScratch scratch = steppedPlayerAnimations$renderScratch.get();
+        for (steppedPlayerAnimations$QuadRenderData side : bendyLayout.sides()) {
+            BendableCuboid.Quad bendySide = side.quad();
+            Vector3f first = bendySide.vertices[0].getPos();
+            Vector3f second = bendySide.vertices[1].getPos();
+            Vector3f third = bendySide.vertices[2].getPos();
+            Vector3f fourth = bendySide.vertices[3].getPos();
+            scratch.firstEdge.set(second).sub(fourth);
+            scratch.normal.set(first).sub(third).cross(scratch.firstEdge).normalize();
+            if (!scratch.normal.isFinite()) {
+                scratch.normal.set(0.0F, 1.0F, 0.0F);
+            }
+            scratch.normal.mul(normalMatrix);
+            for (int index = 0; index < 4; index++) {
+                Vector3f current = bendySide.vertices[index].getPos();
+                positionMatrix.transformPosition(
+                        current.x() / 16.0F,
+                        current.y() / 16.0F,
+                        current.z() / 16.0F,
+                        scratch.transformedPosition
+                );
+                vertices.addVertex(
+                        scratch.transformedPosition.x(),
+                        scratch.transformedPosition.y(),
+                        scratch.transformedPosition.z(),
+                        color,
+                        side.u()[index],
+                        side.v()[index],
+                        overlay,
+                        light,
+                        scratch.normal.x(),
+                        scratch.normal.y(),
+                        scratch.normal.z()
+                );
+            }
+        }
+    }
+
+    @Unique
+    private static steppedPlayerAnimations$BendyLayout steppedPlayerAnimations$buildBendyLayout(
+            BendableCuboid bendyCuboid,
+            List<steppedPlayerAnimations$FaceUv> sourceFaces
+    ) throws ReflectiveOperationException {
         if (steppedPlayerAnimations$bendySides == null) {
             steppedPlayerAnimations$bendySides = BendableCuboid.class.getDeclaredField("sides");
             steppedPlayerAnimations$bendySides.setAccessible(true);
         }
         BendableCuboid.Quad[] bendySides =
                 (BendableCuboid.Quad[]) steppedPlayerAnimations$bendySides.get(bendyCuboid);
-
-        Matrix4f positionMatrix = pose.pose();
-        Matrix3f normalMatrix = pose.normal();
-        Vector3f transformedPosition = new Vector3f();
-        for (BendableCuboid.Quad bendySide : bendySides) {
-            Vector3f[] originalPositions = new Vector3f[4];
-            Vector3f[] currentPositions = new Vector3f[4];
-            for (int index = 0; index < 4; index++) {
-                IRepositionableVertex vertex = (IRepositionableVertex) bendySide.vertices[index];
-                originalPositions[index] = vertex.getPosObject().getOriginalPos();
-                currentPositions[index] = vertex.getPos();
+        steppedPlayerAnimations$QuadRenderData[] renderData =
+                new steppedPlayerAnimations$QuadRenderData[bendySides.length];
+        Vector3f[] originalPositions = new Vector3f[4];
+        for (int sideIndex = 0; sideIndex < bendySides.length; sideIndex++) {
+            BendableCuboid.Quad side = bendySides[sideIndex];
+            for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+                IRepositionableVertex vertex = (IRepositionableVertex) side.vertices[vertexIndex];
+                originalPositions[vertexIndex] = vertex.getPosObject().getOriginalPos();
             }
-
             steppedPlayerAnimations$FaceUv sourceFace =
                     steppedPlayerAnimations$findFace(sourceFaces, originalPositions);
-            Vector3f normal = steppedPlayerAnimations$normal(currentPositions).mul(normalMatrix);
-            for (int index = 0; index < 4; index++) {
-                Vector3f current = currentPositions[index];
-                positionMatrix.transformPosition(
-                        current.x() / 16.0F,
-                        current.y() / 16.0F,
-                        current.z() / 16.0F,
-                        transformedPosition
-                );
-                steppedPlayerAnimations$Uv uv = sourceFace.uvAt(originalPositions[index]);
-                vertices.addVertex(
-                        transformedPosition.x(),
-                        transformedPosition.y(),
-                        transformedPosition.z(),
-                        color,
-                        uv.u(),
-                        uv.v(),
-                        overlay,
-                        light,
-                        normal.x(),
-                        normal.y(),
-                        normal.z()
-                );
+            float[] u = new float[4];
+            float[] v = new float[4];
+            for (int vertexIndex = 0; vertexIndex < 4; vertexIndex++) {
+                steppedPlayerAnimations$Uv uv = sourceFace.uvAt(originalPositions[vertexIndex]);
+                u[vertexIndex] = uv.u();
+                v[vertexIndex] = uv.v();
             }
+            renderData[sideIndex] = new steppedPlayerAnimations$QuadRenderData(side, u, v);
         }
+        return new steppedPlayerAnimations$BendyLayout(renderData);
     }
 
     @Unique
@@ -323,14 +362,24 @@ abstract class EmfBendyCubeRenderMixin {
     }
 
     @Unique
-    private static Vector3f steppedPlayerAnimations$normal(Vector3f[] positions) {
-        Vector3f firstEdge = new Vector3f(positions[1]).sub(positions[3]);
-        Vector3f secondEdge = new Vector3f(positions[0]).sub(positions[2]);
-        Vector3f normal = secondEdge.cross(firstEdge).normalize();
-        if (!normal.isFinite()) {
-            normal.set(0.0F, 1.0F, 0.0F);
-        }
-        return normal;
+    private record steppedPlayerAnimations$BendyLayout(
+            steppedPlayerAnimations$QuadRenderData[] sides
+    ) {
+    }
+
+    @Unique
+    private record steppedPlayerAnimations$QuadRenderData(
+            BendableCuboid.Quad quad,
+            float[] u,
+            float[] v
+    ) {
+    }
+
+    @Unique
+    private static final class steppedPlayerAnimations$RenderScratch {
+        private final Vector3f firstEdge = new Vector3f();
+        private final Vector3f normal = new Vector3f();
+        private final Vector3f transformedPosition = new Vector3f();
     }
 
     @Unique

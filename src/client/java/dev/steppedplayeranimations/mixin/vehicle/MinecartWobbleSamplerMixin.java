@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
+import dev.steppedplayeranimations.timing.ExpiringStateCache;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.MinecartRenderer;
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
@@ -15,14 +16,13 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @Mixin(MinecartRenderer.class)
 abstract class MinecartWobbleSamplerMixin {
     @Unique
-    private static final Map<UUID, WobbleState> steppedPlayerAnimations$WOBBLE_STATES = new HashMap<>();
+    private static final ExpiringStateCache<UUID, WobbleState> steppedPlayerAnimations$WOBBLE_STATES =
+            new ExpiringStateCache<>();
     @Unique
     private static boolean steppedPlayerAnimations$logged;
     @Unique
@@ -72,9 +72,9 @@ abstract class MinecartWobbleSamplerMixin {
         }
 
         long now = SteppedAnimationClock.nowNanos();
-        WobbleState state = steppedPlayerAnimations$WOBBLE_STATES.computeIfAbsent(
+        WobbleState state = steppedPlayerAnimations$WOBBLE_STATES.getOrCreate(
                 minecart.getUUID(),
-                ignored -> new WobbleState()
+                WobbleState::new
         );
         if (state.gate.shouldCapture(
                 now,

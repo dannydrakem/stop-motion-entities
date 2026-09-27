@@ -6,6 +6,7 @@ import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.render.SteppedRenderContext;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
+import dev.steppedplayeranimations.timing.ExpiringStateCache;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +27,8 @@ import java.util.WeakHashMap;
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartWithState", remap = false)
 abstract class EmfFinalPoseSamplerMixin {
-    private static final Map<Object, Map<SampleKey, SampleState>> SAMPLES = new WeakHashMap<>();
+    private static final Map<Object, ExpiringStateCache<SampleKey, SampleState>> SAMPLES = new WeakHashMap<>();
+    private static final Map<Object, List<ModelPart>> ROOT_PARTS = new WeakHashMap<>();
     private static Method getRoot;
     private static Field modelName;
     private static Method getFileName;
@@ -41,6 +42,7 @@ abstract class EmfFinalPoseSamplerMixin {
     private static final Set<String> LOGGED_HOLD_MODELS = new LinkedHashSet<>();
 
     private PoseSnapshot steppedPlayerAnimations$poseBeforeRender;
+    private boolean steppedPlayerAnimations$restorePoseAfterRender;
 
     @Inject(method = "method_22699", at = @At("HEAD"))
     private void steppedPlayerAnimations$rememberPoseBeforeRender(
@@ -51,7 +53,7 @@ abstract class EmfFinalPoseSamplerMixin {
             int color,
             CallbackInfo callback
     ) {
-        steppedPlayerAnimations$poseBeforeRender = null;
+        steppedPlayerAnimations$restorePoseAfterRender = false;
         if (reflectionFailed || !SteppedAnimationConfig.isSteppingActive()) {
             return;
         }
@@ -65,9 +67,14 @@ abstract class EmfFinalPoseSamplerMixin {
             Object root = getRoot.invoke(this);
             boolean isolatedRenderPass = isInHand.getBoolean(null) || isLayerPhase.getBoolean(null);
             if (root == this && isolatedRenderPass) {
-                steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(
-                        ((ModelPart) root).getAllParts().toList()
-                );
+                List<ModelPart> parts = steppedPlayerAnimations$parts(root, (ModelPart) root);
+                if (steppedPlayerAnimations$poseBeforeRender == null
+                        || !steppedPlayerAnimations$poseBeforeRender.matches(parts)) {
+                    steppedPlayerAnimations$poseBeforeRender = new PoseSnapshot(parts);
+                } else {
+                    steppedPlayerAnimations$poseBeforeRender.capture();
+                }
+                steppedPlayerAnimations$restorePoseAfterRender = true;
             }
         } catch (ReflectiveOperationException | ClassCastException exception) {
             steppedPlayerAnimations$disableSampler(exception);
@@ -136,9 +143,9 @@ abstract class EmfFinalPoseSamplerMixin {
             int color,
             CallbackInfo callback
     ) {
-        if (steppedPlayerAnimations$poseBeforeRender != null) {
+        if (steppedPlayerAnimations$restorePoseAfterRender) {
             steppedPlayerAnimations$poseBeforeRender.restore();
-            steppedPlayerAnimations$poseBeforeRender = null;
+            steppedPlayerAnimations$restorePoseAfterRender = false;
         }
     }
 
@@ -151,10 +158,13 @@ abstract class EmfFinalPoseSamplerMixin {
             long renderSequence,
             long now
     ) {
-        Map<SampleKey, SampleState> byContext = SAMPLES.computeIfAbsent(rootIdentity, ignored -> new HashMap<>());
-        SampleState state = byContext.computeIfAbsent(
+        ExpiringStateCache<SampleKey, SampleState> byContext = SAMPLES.computeIfAbsent(
+                rootIdentity,
+                ignored -> new ExpiringStateCache<>()
+        );
+        SampleState state = byContext.getOrCreate(
                 new SampleKey(entityId, handRender, SteppedRenderContext.isInventory()),
-                ignored -> new SampleState()
+                SampleState::new
         );
         if (state.lastRenderSequence == renderSequence) {
             // EMF can render the same root several times during one entity pass. Villagers, for
@@ -169,12 +179,16 @@ abstract class EmfFinalPoseSamplerMixin {
         }
         state.lastRenderSequence = renderSequence;
 
-        List<ModelPart> parts = root.getAllParts().toList();
+        List<ModelPart> parts = steppedPlayerAnimations$parts(rootIdentity, root);
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
         long intervalNanos = SteppedAnimationConfig.sampleIntervalNanos();
         boolean sampleDue = state.gate.shouldCapture(now, intervalNanos, SteppedAnimationConfig.revision());
         if (topologyChanged || sampleDue) {
-            state.snapshot = PoseSnapshot.capture(parts);
+            if (topologyChanged) {
+                state.snapshot = new PoseSnapshot(parts);
+            } else {
+                state.snapshot.capture();
+            }
             if (LOGGED_CAPTURE_MODELS.add(modelName)) {
                 SteppedPlayerAnimationsClient.LOGGER.info(
                         "Stepped final-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
@@ -194,6 +208,13 @@ abstract class EmfFinalPoseSamplerMixin {
                 );
             }
         }
+    }
+
+    private static List<ModelPart> steppedPlayerAnimations$parts(Object rootIdentity, ModelPart root) {
+        return ROOT_PARTS.computeIfAbsent(
+                rootIdentity,
+                ignored -> List.copyOf(root.getAllParts().toList())
+        );
     }
 
     private static void steppedPlayerAnimations$initializeReflection() throws ReflectiveOperationException {
@@ -236,44 +257,66 @@ abstract class EmfFinalPoseSamplerMixin {
         private PoseSnapshot snapshot;
     }
 
-    private record PoseSnapshot(List<PartSnapshot> parts) {
-        private static PoseSnapshot capture(List<ModelPart> modelParts) {
-            return new PoseSnapshot(modelParts.stream().map(PartSnapshot::new).toList());
+    private static final class PoseSnapshot {
+        private final List<ModelPart> topology;
+        private final PartSnapshot[] parts;
+
+        private PoseSnapshot(List<ModelPart> modelParts) {
+            topology = modelParts;
+            parts = new PartSnapshot[modelParts.size()];
+            for (int index = 0; index < modelParts.size(); index++) {
+                parts[index] = new PartSnapshot(modelParts.get(index));
+            }
         }
 
         private boolean matches(List<ModelPart> modelParts) {
-            if (parts.size() != modelParts.size()) {
+            if (topology == modelParts) {
+                return true;
+            }
+            if (parts.length != modelParts.size()) {
                 return false;
             }
-            for (int index = 0; index < parts.size(); index++) {
-                if (parts.get(index).part != modelParts.get(index)) {
+            for (int index = 0; index < parts.length; index++) {
+                if (parts[index].part != modelParts.get(index)) {
                     return false;
                 }
             }
             return true;
         }
 
+        private void capture() {
+            for (PartSnapshot part : parts) {
+                part.capture();
+            }
+        }
+
         private void restore() {
-            parts.forEach(PartSnapshot::restore);
+            for (PartSnapshot part : parts) {
+                part.restore();
+            }
         }
     }
 
     private static final class PartSnapshot {
         private final ModelPart part;
-        private final float x;
-        private final float y;
-        private final float z;
-        private final float xRot;
-        private final float yRot;
-        private final float zRot;
-        private final float xScale;
-        private final float yScale;
-        private final float zScale;
-        private final boolean visible;
-        private final boolean skipDraw;
+        private float x;
+        private float y;
+        private float z;
+        private float xRot;
+        private float yRot;
+        private float zRot;
+        private float xScale;
+        private float yScale;
+        private float zScale;
+        private boolean visible;
+        private boolean skipDraw;
 
         private PartSnapshot(ModelPart part) {
             this.part = part;
+            capture();
+        }
+
+        private void capture() {
             this.x = part.x;
             this.y = part.y;
             this.z = part.z;

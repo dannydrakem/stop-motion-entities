@@ -17,6 +17,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Set;
 
 public final class SteppedAnimationConfig {
@@ -28,6 +30,7 @@ public final class SteppedAnimationConfig {
     private static boolean enabled = true;
     private static FrameRate frameRate = FrameRate.FPS_12;
     private static Set<String> disabledEntityTypes = new HashSet<>();
+    private static final Map<EntityType<?>, Boolean> ENTITY_ENABLED_CACHE = new IdentityHashMap<>();
     private static long revision;
 
     private SteppedAnimationConfig() {
@@ -48,6 +51,7 @@ public final class SteppedAnimationConfig {
                         ? new HashSet<>()
                         : new HashSet<>(loaded.disabledEntityTypes);
                 disabledEntityTypes.removeIf(entityId -> entityId == null || entityId.isBlank());
+                ENTITY_ENABLED_CACHE.clear();
                 normalizeState();
             }
             revision++;
@@ -85,8 +89,14 @@ public final class SteppedAnimationConfig {
     }
 
     public static boolean isEntityTypeEnabled(EntityType<?> entityType) {
+        Boolean cached = ENTITY_ENABLED_CACHE.get(entityType);
+        if (cached != null) {
+            return cached;
+        }
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
-        return entityId == null || !disabledEntityTypes.contains(entityId.toString());
+        boolean entityEnabled = entityId == null || !disabledEntityTypes.contains(entityId.toString());
+        ENTITY_ENABLED_CACHE.put(entityType, entityEnabled);
+        return entityEnabled;
     }
 
     public static void setEntityTypeEnabled(EntityType<?> entityType, boolean entityEnabled) {
@@ -99,6 +109,7 @@ public final class SteppedAnimationConfig {
                 ? disabledEntityTypes.remove(entityId.toString())
                 : disabledEntityTypes.add(entityId.toString());
         if (changed) {
+            ENTITY_ENABLED_CACHE.clear();
             revision++;
             save();
         }
@@ -116,6 +127,7 @@ public final class SteppedAnimationConfig {
                     : disabledEntityTypes.add(entityId.toString());
         }
         if (changed) {
+            ENTITY_ENABLED_CACHE.clear();
             revision++;
             save();
         }

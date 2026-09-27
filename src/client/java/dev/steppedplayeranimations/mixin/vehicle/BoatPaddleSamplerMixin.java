@@ -3,6 +3,7 @@ package dev.steppedplayeranimations.mixin.vehicle;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
+import dev.steppedplayeranimations.timing.ExpiringStateCache;
 import net.minecraft.client.model.BoatModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.vehicle.Boat;
@@ -14,8 +15,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @Mixin(BoatModel.class)
@@ -23,7 +22,8 @@ abstract class BoatPaddleSamplerMixin {
     @Unique
     private static boolean steppedPlayerAnimations$logged;
     @Unique
-    private final Map<UUID, PaddleState> steppedPlayerAnimations$paddleStates = new HashMap<>();
+    private final ExpiringStateCache<UUID, PaddleState> steppedPlayerAnimations$paddleStates =
+            new ExpiringStateCache<>();
 
     @Shadow
     @Final
@@ -49,9 +49,9 @@ abstract class BoatPaddleSamplerMixin {
             return;
         }
         long now = SteppedAnimationClock.nowNanos();
-        PaddleState state = steppedPlayerAnimations$paddleStates.computeIfAbsent(
+        PaddleState state = steppedPlayerAnimations$paddleStates.getOrCreate(
                 boat.getUUID(),
-                ignored -> new PaddleState()
+                PaddleState::new
         );
         if (state.gate.shouldCapture(
                 now,
