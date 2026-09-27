@@ -2,6 +2,7 @@ package dev.steppedplayeranimations.config;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -26,15 +27,19 @@ public final class SteppedAnimationsConfigScreen extends Screen {
                     SteppedAnimationConfig.toggleEnabled();
                     refreshMessages();
                 }
-        ).bounds(left, top, 200, 20).build());
+        ).bounds(left, top, 200, 20)
+                .tooltip(Tooltip.create(Component.translatable("tooltip.stepped_player_animations.enabled")))
+                .build());
 
         frameRateButton = addRenderableWidget(Button.builder(
                 frameRateMessage(),
                 button -> {
-                    SteppedAnimationConfig.cycleFrameRate();
+                    SteppedAnimationConfig.cycleFrameRateForward();
                     refreshMessages();
                 }
-        ).bounds(left, top + 24, 200, 20).build());
+        ).bounds(left, top + 24, 200, 20)
+                .tooltip(Tooltip.create(Component.translatable("tooltip.stepped_player_animations.frame_rate")))
+                .build());
 
         addRenderableWidget(Button.builder(
                 Component.translatable("gui.done"),

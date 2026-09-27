@@ -23,13 +23,19 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
     private static final KeyMapping TOGGLE_KEY = new KeyMapping(
             "key.stepped_player_animations.toggle",
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_P,
+            GLFW.GLFW_KEY_APOSTROPHE,
             "key.category.stepped_player_animations"
     );
-    private static final KeyMapping CYCLE_FRAME_RATE_KEY = new KeyMapping(
-            "key.stepped_player_animations.cycle_frame_rate",
+    private static final KeyMapping PREVIOUS_FRAME_RATE_KEY = new KeyMapping(
+            "key.stepped_player_animations.previous_frame_rate",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_LEFT_BRACKET,
+            "key.category.stepped_player_animations"
+    );
+    private static final KeyMapping NEXT_FRAME_RATE_KEY = new KeyMapping(
+            "key.stepped_player_animations.next_frame_rate",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_RIGHT_BRACKET,
             "key.category.stepped_player_animations"
     );
 
@@ -37,7 +43,8 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
     public void onInitializeClient() {
         SteppedAnimationConfig.load();
         KeyBindingHelper.registerKeyBinding(TOGGLE_KEY);
-        KeyBindingHelper.registerKeyBinding(CYCLE_FRAME_RATE_KEY);
+        KeyBindingHelper.registerKeyBinding(PREVIOUS_FRAME_RATE_KEY);
+        KeyBindingHelper.registerKeyBinding(NEXT_FRAME_RATE_KEY);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.screen != null) {
                 return;
@@ -56,17 +63,13 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
                     );
                 }
             }
-            while (CYCLE_FRAME_RATE_KEY.consumeClick()) {
-                SteppedAnimationConfig.cycleFrameRate();
-                if (client.player != null) {
-                    client.player.displayClientMessage(
-                            Component.translatable(
-                                    "message.stepped_player_animations.frame_rate",
-                                    SteppedAnimationsConfigScreen.frameRateValue()
-                            ),
-                            true
-                    );
-                }
+            while (PREVIOUS_FRAME_RATE_KEY.consumeClick()) {
+                SteppedAnimationConfig.cycleFrameRateBackward();
+                showFrameRateMessage(client.player);
+            }
+            while (NEXT_FRAME_RATE_KEY.consumeClick()) {
+                SteppedAnimationConfig.cycleFrameRateForward();
+                showFrameRateMessage(client.player);
             }
         });
 
@@ -87,6 +90,18 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
     private static void requireMod(List<String> missing, String modId) {
         if (!FabricLoader.getInstance().isModLoaded(modId)) {
             missing.add(modId);
+        }
+    }
+
+    private static void showFrameRateMessage(net.minecraft.client.player.LocalPlayer player) {
+        if (player != null) {
+            player.displayClientMessage(
+                    Component.translatable(
+                            "message.stepped_player_animations.frame_rate",
+                            SteppedAnimationsConfigScreen.frameRateValue()
+                    ),
+                    true
+            );
         }
     }
 }

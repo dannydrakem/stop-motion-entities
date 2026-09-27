@@ -36,6 +36,7 @@ public final class SteppedAnimationConfig {
             if (loaded != null) {
                 enabled = loaded.enabled;
                 frameRate = loaded.frameRate == null ? FrameRate.FPS_12 : loaded.frameRate;
+                normalizeState();
             }
             revision++;
         } catch (IOException | RuntimeException exception) {
@@ -72,25 +73,45 @@ public final class SteppedAnimationConfig {
     }
 
     public static void setEnabled(boolean newEnabled) {
-        if (enabled == newEnabled) {
+        FrameRate newFrameRate = newEnabled ? FrameRate.FPS_12 : FrameRate.UNLIMITED;
+        if (enabled == newEnabled && frameRate == newFrameRate) {
             return;
         }
+        enabled = newEnabled;
+        frameRate = newFrameRate;
+        revision++;
+        save();
+    }
+
+    public static void cycleFrameRateForward() {
+        setFrameRate(frameRate.next());
+    }
+
+    public static void cycleFrameRateBackward() {
+        setFrameRate(frameRate.previous());
+    }
+
+    public static void setFrameRate(FrameRate newFrameRate) {
+        if (newFrameRate == null) {
+            return;
+        }
+
+        boolean newEnabled = newFrameRate != FrameRate.UNLIMITED;
+        if (frameRate == newFrameRate && enabled == newEnabled) {
+            return;
+        }
+
+        frameRate = newFrameRate;
         enabled = newEnabled;
         revision++;
         save();
     }
 
-    public static void cycleFrameRate() {
-        setFrameRate(frameRate.next());
-    }
-
-    public static void setFrameRate(FrameRate newFrameRate) {
-        if (newFrameRate == null || frameRate == newFrameRate) {
-            return;
+    private static void normalizeState() {
+        if (!enabled || frameRate == FrameRate.UNLIMITED) {
+            enabled = false;
+            frameRate = FrameRate.UNLIMITED;
         }
-        frameRate = newFrameRate;
-        revision++;
-        save();
     }
 
     public static void save() {
@@ -140,6 +161,10 @@ public final class SteppedAnimationConfig {
 
         public FrameRate next() {
             return VALUES[(ordinal() + 1) % VALUES.length];
+        }
+
+        public FrameRate previous() {
+            return VALUES[(ordinal() - 1 + VALUES.length) % VALUES.length];
         }
     }
 
