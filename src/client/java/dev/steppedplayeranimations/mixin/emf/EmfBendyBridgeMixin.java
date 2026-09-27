@@ -82,6 +82,7 @@ abstract class EmfBendyBridgeMixin {
     private static Field customPartId;
     private static boolean reflectionFailed;
     private static final Set<String> LOGGED_LIVE_HEAD_BRANCHES = new LinkedHashSet<>();
+    private static final Set<String> LOGGED_EMBEDDED_HEAD_RIGS = new LinkedHashSet<>();
     private static final Set<String> LOGGED_NON_ZERO_BEND_SOURCES = new LinkedHashSet<>();
     private static String lastLoggedBlendMask;
 
@@ -259,12 +260,15 @@ abstract class EmfBendyBridgeMixin {
             root.getAllParts().forEach(liveParts::add);
             steppedPlayerAnimations$logLiveHeadBranch(id, liveParts.size());
         } else {
-            // Expressive Fresh Moves combines ordinary head geometry and facial animation
-            // under one custom `head` root. Keep that root paused so its walking/breathing
-            // offsets cannot stack with Emotecraft, but find and preserve the nested facial
-            // subtrees themselves. This also handles unknown packs with similarly nested rigs.
+            // Expressive Fresh Moves combines ordinary head geometry and a 400-part facial
+            // selector under one custom `head` root. Unlike a standalone player_face branch,
+            // those nested parts depend on the pack's own root animation and skin-feature
+            // switching. Letting them run while Emotecraft owns the root makes texture layers
+            // drift and expose the wrong skin pixels. Detect the embedded rig for diagnostics,
+            // but use the safe fallback: pause it together with the root during the emote.
             Set<ModelPart> visited = Collections.newSetFromMap(new IdentityHashMap<>());
             Deque<ModelPart> remaining = new ArrayDeque<>();
+            Set<String> embeddedFacialBranches = new LinkedHashSet<>();
             Map<String, ModelPart> rootChildren =
                     ((ModelPartChildrenAccessor) (Object) root).steppedPlayerAnimations$children();
             remaining.addAll(rootChildren.values());
@@ -281,9 +285,7 @@ abstract class EmfBendyBridgeMixin {
                         ? steppedPlayerAnimations$getNormalizedPartId(part)
                         : "";
                 if (steppedPlayerAnimations$isFacialComponentName(partId)) {
-                    int before = liveParts.size();
-                    part.getAllParts().forEach(liveParts::add);
-                    steppedPlayerAnimations$logLiveHeadBranch(partId, liveParts.size() - before);
+                    embeddedFacialBranches.add(partId);
                     continue;
                 }
 
@@ -292,15 +294,19 @@ abstract class EmfBendyBridgeMixin {
                 for (Map.Entry<String, ModelPart> child : children.entrySet()) {
                     String childName = steppedPlayerAnimations$normalizeEmfId(child.getKey());
                     if (steppedPlayerAnimations$isFacialComponentName(childName)) {
-                        int before = liveParts.size();
-                        child.getValue().getAllParts().forEach(liveParts::add);
-                        steppedPlayerAnimations$logLiveHeadBranch(
-                                childName,
-                                liveParts.size() - before
-                        );
+                        embeddedFacialBranches.add(childName);
                     } else {
                         remaining.addLast(child.getValue());
                     }
+                }
+            }
+            if (!embeddedFacialBranches.isEmpty()) {
+                if (LOGGED_EMBEDDED_HEAD_RIGS.add(id)) {
+                    SteppedPlayerAnimationsClient.LOGGER.info(
+                            "Embedded EMF facial rig detected under '{}'; using safe emote pause for nested branches {}.",
+                            id,
+                            embeddedFacialBranches
+                    );
                 }
             }
         }
