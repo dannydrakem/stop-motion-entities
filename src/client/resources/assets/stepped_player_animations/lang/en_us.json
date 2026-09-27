@@ -19,5 +19,6 @@
   "screen.stepped_player_animations.entities.all_block": "All entities",
   "option.stepped_player_animations.entities.enable_all": "Enable all",
   "option.stepped_player_animations.entities.disable_all": "Disable all",
+  "screen.stepped_player_animations.entities.search": "Search entities...",
   "tooltip.stepped_player_animations.entities": "Enables or disables stepped animation for individual entities. You can disable the effect for selected entities or disable it for all of them. Enabled for all entities by default"
 }

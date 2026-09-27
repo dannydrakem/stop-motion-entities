@@ -19,5 +19,6 @@
   "screen.stepped_player_animations.entities.all_block": "Все сущности",
   "option.stepped_player_animations.entities.enable_all": "Включить всех",
   "option.stepped_player_animations.entities.disable_all": "Отключить всех",
+  "screen.stepped_player_animations.entities.search": "Поиск сущностей...",
   "tooltip.stepped_player_animations.entities": "Включает или отключает ступенчатую анимацию у отдельных сущностей. Вы можете отключить эффект у желаемых сущностей или отключить её вообще у всех. Включено у всех по умолчанию"
 }

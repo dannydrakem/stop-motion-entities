@@ -35,6 +35,7 @@ abstract class EmfFinalPoseSamplerMixin {
     private static Field entityRenderCount;
     private static Method getCurrentEntity;
     private static Field isInHand;
+    private static Field isLayerPhase;
     private static boolean reflectionFailed;
     private static final Set<String> LOGGED_CAPTURE_MODELS = new LinkedHashSet<>();
     private static final Set<String> LOGGED_HOLD_MODELS = new LinkedHashSet<>();
@@ -62,7 +63,8 @@ abstract class EmfFinalPoseSamplerMixin {
                 return;
             }
             Object root = getRoot.invoke(this);
-            if (root == this) {
+            boolean isolatedRenderPass = isInHand.getBoolean(null) || isLayerPhase.getBoolean(null);
+            if (root == this && isolatedRenderPass) {
                 steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(
                         ((ModelPart) root).getAllParts().toList()
                 );
@@ -201,6 +203,7 @@ abstract class EmfFinalPoseSamplerMixin {
         Class<?> managerClass = Class.forName("traben.entity_model_features.EMFManager");
         getCurrentEntity = animationApiClass.getMethod("getCurrentEntity");
         isInHand = animationStateClass.getField("isInHand");
+        isLayerPhase = animationStateClass.getField("isLayerPhase");
         getRoot = modelPartClass.getMethod("getRoot");
         modelName = rootClass.getField("modelName");
         getFileName = modelIdClass.getMethod("getfileName");

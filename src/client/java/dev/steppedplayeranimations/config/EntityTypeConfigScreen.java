@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,6 +34,7 @@ public final class EntityTypeConfigScreen extends Screen {
     private EntityTypeList entityTypeList;
     private Checkbox enableAllCheckbox;
     private Checkbox disableAllCheckbox;
+    private EditBox searchBox;
     private boolean synchronizingControls;
 
     public EntityTypeConfigScreen(Screen parent) {
@@ -41,6 +44,7 @@ public final class EntityTypeConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        String previousSearch = searchBox == null ? "" : searchBox.getValue();
         int listWidth = Math.min(360, width - 32);
         int blockLeft = (width - listWidth) / 2;
         entityTypes = supportedEntityTypes(minecraft);
@@ -79,12 +83,26 @@ public final class EntityTypeConfigScreen extends Screen {
                 this::synchronizeControls,
                 entityTypes,
                 listWidth,
-                Math.max(40, height - 132),
-                76,
+                Math.max(40, height - 160),
+                104,
                 24
         );
         entityTypeList.setX(blockLeft);
         addRenderableWidget(entityTypeList);
+
+        searchBox = new EditBox(
+                font,
+                blockLeft,
+                78,
+                listWidth,
+                20,
+                Component.translatable("screen.stepped_player_animations.entities.search")
+        );
+        searchBox.setHint(Component.translatable("screen.stepped_player_animations.entities.search"));
+        searchBox.setMaxLength(128);
+        searchBox.setResponder(entityTypeList::filter);
+        searchBox.setValue(previousSearch);
+        addRenderableWidget(searchBox);
 
         addRenderableWidget(Button.builder(
                 Component.translatable("gui.done"),
@@ -177,6 +195,8 @@ public final class EntityTypeConfigScreen extends Screen {
     }
 
     private static final class EntityTypeList extends ContainerObjectSelectionList<EntityTypeEntry> {
+        private final List<EntityTypeEntry> allEntries;
+
         private EntityTypeList(
                 Minecraft minecraft,
                 Runnable onEntryChanged,
@@ -188,13 +208,23 @@ public final class EntityTypeConfigScreen extends Screen {
         ) {
             super(minecraft, width, height, y, itemHeight);
             centerListVertically = false;
-            entityTypes.forEach(entityType -> addEntry(
-                    new EntityTypeEntry(minecraft, entityType, width - 28, onEntryChanged)
-            ));
+            allEntries = entityTypes.stream()
+                    .map(entityType -> new EntityTypeEntry(minecraft, entityType, width - 28, onEntryChanged))
+                    .toList();
+            allEntries.forEach(this::addEntry);
         }
 
         private void synchronizeCheckboxes() {
-            children().forEach(EntityTypeEntry::synchronizeCheckbox);
+            allEntries.forEach(EntityTypeEntry::synchronizeCheckbox);
+        }
+
+        private void filter(String query) {
+            String normalizedQuery = query.strip().toLowerCase(Locale.ROOT);
+            clearEntries();
+            allEntries.stream()
+                    .filter(entry -> entry.matches(normalizedQuery))
+                    .forEach(this::addEntry);
+            setScrollAmount(0.0D);
         }
 
         @Override
@@ -247,6 +277,16 @@ public final class EntityTypeConfigScreen extends Screen {
                     synchronizing = false;
                 }
             }
+        }
+
+        private boolean matches(String normalizedQuery) {
+            if (normalizedQuery.isEmpty()) {
+                return true;
+            }
+            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+            return entityType.getDescription().getString().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                    || entityType.getDescriptionId().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                    || entityId != null && entityId.toString().toLowerCase(Locale.ROOT).contains(normalizedQuery);
         }
 
         @Override

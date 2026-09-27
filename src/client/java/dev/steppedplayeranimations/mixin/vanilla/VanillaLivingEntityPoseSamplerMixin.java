@@ -67,7 +67,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         }
 
         List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);
-        if (!parts.isEmpty() && !steppedPlayerAnimations$isEmfBacked(parts)) {
+        if (!parts.isEmpty()) {
             steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(parts);
         }
     }
