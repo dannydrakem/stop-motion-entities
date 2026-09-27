@@ -3,6 +3,7 @@ package dev.steppedplayeranimations.mixin.vanilla;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
+import dev.steppedplayeranimations.render.SteppedRenderContext;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.AgeableListModel;
@@ -33,7 +34,7 @@ import java.util.WeakHashMap;
 @Mixin(LivingEntityRenderer.class)
 abstract class VanillaLivingEntityPoseSamplerMixin {
     @Unique
-    private static final Map<EntityModel<?>, Map<UUID, SampleState>> steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
+    private static final Map<EntityModel<?>, Map<SampleKey, SampleState>> steppedPlayerAnimations$SAMPLES = new WeakHashMap<>();
     @Unique
     private static final Set<String> steppedPlayerAnimations$LOGGED_CAPTURE_MODELS = new LinkedHashSet<>();
     @Unique
@@ -97,11 +98,14 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         }
 
         String modelName = model.getClass().getSimpleName();
-        Map<UUID, SampleState> byEntity = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
+        Map<SampleKey, SampleState> byContext = steppedPlayerAnimations$SAMPLES.computeIfAbsent(
                 model,
                 ignored -> new HashMap<>()
         );
-        SampleState state = byEntity.computeIfAbsent(entity.getUUID(), ignored -> new SampleState());
+        SampleState state = byContext.computeIfAbsent(
+                new SampleKey(entity.getUUID(), SteppedRenderContext.isInventory()),
+                ignored -> new SampleState()
+        );
         long now = SteppedAnimationClock.nowNanos();
         boolean topologyChanged = state.snapshot == null || !state.snapshot.matches(parts);
         long intervalNanos = SteppedAnimationConfig.sampleIntervalNanos();
@@ -191,6 +195,9 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
     private static final class SampleState {
         private final SteppedAnimationClock.Gate gate = new SteppedAnimationClock.Gate();
         private PoseSnapshot snapshot;
+    }
+
+    private record SampleKey(UUID entityId, boolean inventoryRender) {
     }
 
     @Unique

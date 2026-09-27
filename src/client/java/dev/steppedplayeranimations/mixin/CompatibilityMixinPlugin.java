@@ -30,6 +30,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         FabricLoader loader = FabricLoader.getInstance();
         if (mixinClassName.endsWith("AgeableListModelAccessor")
+                || mixinClassName.endsWith("InventoryEntityRenderContextMixin")
                 || mixinClassName.endsWith("VanillaLivingEntityPoseSamplerMixin")
                 || mixinClassName.endsWith("BoatPaddleSamplerMixin")
                 || mixinClassName.endsWith("MinecartWobbleSamplerMixin")) {

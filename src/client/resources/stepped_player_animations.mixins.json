@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "vanilla.AgeableListModelAccessor",
+    "vanilla.InventoryEntityRenderContextMixin",
     "vanilla.VanillaLivingEntityPoseSamplerMixin",
     "vehicle.BoatPaddleSamplerMixin",
     "vehicle.MinecartWobbleSamplerMixin",

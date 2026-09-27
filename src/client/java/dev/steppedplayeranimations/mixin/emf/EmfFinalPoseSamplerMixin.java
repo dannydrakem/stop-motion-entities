@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.steppedplayeranimations.SteppedPlayerAnimationsClient;
 import dev.steppedplayeranimations.config.SteppedAnimationConfig;
+import dev.steppedplayeranimations.render.SteppedRenderContext;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.Entity;
@@ -143,7 +144,7 @@ abstract class EmfFinalPoseSamplerMixin {
     ) {
         Map<SampleKey, SampleState> byContext = SAMPLES.computeIfAbsent(rootIdentity, ignored -> new HashMap<>());
         SampleState state = byContext.computeIfAbsent(
-                new SampleKey(entityId, handRender),
+                new SampleKey(entityId, handRender, SteppedRenderContext.isInventory()),
                 ignored -> new SampleState()
         );
         if (state.lastRenderSequence == renderSequence) {
@@ -208,7 +209,7 @@ abstract class EmfFinalPoseSamplerMixin {
         );
     }
 
-    private record SampleKey(UUID entityId, boolean handRender) {
+    private record SampleKey(UUID entityId, boolean handRender, boolean inventoryRender) {
     }
 
     private static final class SampleState {
