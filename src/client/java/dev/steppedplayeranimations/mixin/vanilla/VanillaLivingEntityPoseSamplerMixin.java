@@ -41,8 +41,35 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
     @Unique
     private static final Set<String> steppedPlayerAnimations$LOGGED_UNSUPPORTED_MODELS = new LinkedHashSet<>();
 
+    @Unique
+    private PoseSnapshot steppedPlayerAnimations$poseBeforeRender;
+
     @Shadow
     protected EntityModel<?> model;
+
+    @Inject(
+            method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
+            at = @At("HEAD")
+    )
+    private void steppedPlayerAnimations$rememberPoseBeforeRender(
+            LivingEntity entity,
+            float entityYaw,
+            float partialTick,
+            PoseStack poseStack,
+            MultiBufferSource bufferSource,
+            int packedLight,
+            CallbackInfo callback
+    ) {
+        steppedPlayerAnimations$poseBeforeRender = null;
+        if (!SteppedAnimationConfig.isSteppingActive()) {
+            return;
+        }
+
+        List<ModelPart> parts = steppedPlayerAnimations$collectParts(model);
+        if (!parts.isEmpty() && !steppedPlayerAnimations$isEmfBacked(parts)) {
+            steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(parts);
+        }
+    }
 
     @Inject(
             method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
@@ -99,6 +126,25 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
                         modelName, entity.getUUID(), parts.size()
                 );
             }
+        }
+    }
+
+    @Inject(
+            method = "render(Lnet/minecraft/world/entity/LivingEntity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
+            at = @At("RETURN")
+    )
+    private void steppedPlayerAnimations$restorePoseAfterRender(
+            LivingEntity entity,
+            float entityYaw,
+            float partialTick,
+            PoseStack poseStack,
+            MultiBufferSource bufferSource,
+            int packedLight,
+            CallbackInfo callback
+    ) {
+        if (steppedPlayerAnimations$poseBeforeRender != null) {
+            steppedPlayerAnimations$poseBeforeRender.restore();
+            steppedPlayerAnimations$poseBeforeRender = null;
         }
     }
 

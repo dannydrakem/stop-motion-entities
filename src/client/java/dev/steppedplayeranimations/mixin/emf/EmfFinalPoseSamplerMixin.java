@@ -26,16 +26,46 @@ import java.util.WeakHashMap;
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartWithState", remap = false)
 abstract class EmfFinalPoseSamplerMixin {
-    private static final Map<Object, Map<UUID, SampleState>> SAMPLES = new WeakHashMap<>();
+    private static final Map<Object, Map<SampleKey, SampleState>> SAMPLES = new WeakHashMap<>();
     private static Method getRoot;
     private static Field modelName;
     private static Method getFileName;
     private static Method getEmfManager;
     private static Field entityRenderCount;
     private static Method getCurrentEntity;
+    private static Field isInHand;
     private static boolean reflectionFailed;
     private static final Set<String> LOGGED_CAPTURE_MODELS = new LinkedHashSet<>();
     private static final Set<String> LOGGED_HOLD_MODELS = new LinkedHashSet<>();
+
+    private PoseSnapshot steppedPlayerAnimations$poseBeforeRender;
+
+    @Inject(method = "method_22699", at = @At("HEAD"))
+    private void steppedPlayerAnimations$rememberPoseBeforeRender(
+            PoseStack poseStack,
+            VertexConsumer vertexConsumer,
+            int packedLight,
+            int packedOverlay,
+            int color,
+            CallbackInfo callback
+    ) {
+        steppedPlayerAnimations$poseBeforeRender = null;
+        if (reflectionFailed || !SteppedAnimationConfig.isSteppingActive()) {
+            return;
+        }
+
+        try {
+            steppedPlayerAnimations$initializeReflection();
+            Object root = getRoot.invoke(this);
+            if (root == this) {
+                steppedPlayerAnimations$poseBeforeRender = PoseSnapshot.capture(
+                        ((ModelPart) root).getAllParts().toList()
+                );
+            }
+        } catch (ReflectiveOperationException | ClassCastException exception) {
+            steppedPlayerAnimations$disableSampler(exception);
+        }
+    }
 
     @Inject(
             method = "method_22699",
@@ -77,16 +107,28 @@ abstract class EmfFinalPoseSamplerMixin {
                     root,
                     (ModelPart) root,
                     entity.getUUID(),
+                    isInHand.getBoolean(null),
                     emfModelName,
                     renderSequence,
                     SteppedAnimationClock.nowNanos()
             );
         } catch (ReflectiveOperationException | ClassCastException exception) {
-            reflectionFailed = true;
-            SteppedPlayerAnimationsClient.LOGGER.error(
-                    "Could not sample the final EMF entity pose; disabling the stepped-animation sampler.",
-                    exception
-            );
+            steppedPlayerAnimations$disableSampler(exception);
+        }
+    }
+
+    @Inject(method = "method_22699", at = @At("RETURN"))
+    private void steppedPlayerAnimations$restorePoseAfterRender(
+            PoseStack poseStack,
+            VertexConsumer vertexConsumer,
+            int packedLight,
+            int packedOverlay,
+            int color,
+            CallbackInfo callback
+    ) {
+        if (steppedPlayerAnimations$poseBeforeRender != null) {
+            steppedPlayerAnimations$poseBeforeRender.restore();
+            steppedPlayerAnimations$poseBeforeRender = null;
         }
     }
 
@@ -94,12 +136,16 @@ abstract class EmfFinalPoseSamplerMixin {
             Object rootIdentity,
             ModelPart root,
             UUID entityId,
+            boolean handRender,
             String modelName,
             long renderSequence,
             long now
     ) {
-        Map<UUID, SampleState> byEntity = SAMPLES.computeIfAbsent(rootIdentity, ignored -> new HashMap<>());
-        SampleState state = byEntity.computeIfAbsent(entityId, ignored -> new SampleState());
+        Map<SampleKey, SampleState> byContext = SAMPLES.computeIfAbsent(rootIdentity, ignored -> new HashMap<>());
+        SampleState state = byContext.computeIfAbsent(
+                new SampleKey(entityId, handRender),
+                ignored -> new SampleState()
+        );
         if (state.lastRenderSequence == renderSequence) {
             return;
         }
@@ -138,16 +184,31 @@ abstract class EmfFinalPoseSamplerMixin {
         }
 
         Class<?> animationApiClass = Class.forName("traben.entity_model_features.EMFAnimationApi");
+        Class<?> animationStateClass = Class.forName(
+                "traben.entity_model_features.models.animation.state.EMFState"
+        );
         Class<?> modelPartClass = Class.forName("traben.entity_model_features.models.parts.EMFModelPart");
         Class<?> rootClass = Class.forName("traben.entity_model_features.models.parts.EMFModelPartRoot");
         Class<?> modelIdClass = Class.forName("traben.entity_model_features.models.EMFModel_ID");
         Class<?> managerClass = Class.forName("traben.entity_model_features.EMFManager");
         getCurrentEntity = animationApiClass.getMethod("getCurrentEntity");
+        isInHand = animationStateClass.getField("isInHand");
         getRoot = modelPartClass.getMethod("getRoot");
         modelName = rootClass.getField("modelName");
         getFileName = modelIdClass.getMethod("getfileName");
         getEmfManager = managerClass.getMethod("getInstance");
         entityRenderCount = managerClass.getField("entityRenderCount");
+    }
+
+    private static void steppedPlayerAnimations$disableSampler(Exception exception) {
+        reflectionFailed = true;
+        SteppedPlayerAnimationsClient.LOGGER.error(
+                "Could not sample the final EMF entity pose; disabling the stepped-animation sampler.",
+                exception
+        );
+    }
+
+    private record SampleKey(UUID entityId, boolean handRender) {
     }
 
     private static final class SampleState {
