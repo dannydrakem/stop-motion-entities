@@ -28,6 +28,11 @@ import java.util.Set;
 
 public final class EntityTypeConfigScreen extends Screen {
     private final Screen parent;
+    private List<EntityType<?>> entityTypes = List.of();
+    private EntityTypeList entityTypeList;
+    private Checkbox enableAllCheckbox;
+    private Checkbox disableAllCheckbox;
+    private boolean synchronizingControls;
 
     public EntityTypeConfigScreen(Screen parent) {
         super(Component.translatable("screen.stepped_player_animations.entities.title"));
@@ -37,15 +42,49 @@ public final class EntityTypeConfigScreen extends Screen {
     @Override
     protected void init() {
         int listWidth = Math.min(360, width - 32);
-        EntityTypeList list = new EntityTypeList(
+        int blockLeft = (width - listWidth) / 2;
+        entityTypes = supportedEntityTypes(minecraft);
+
+        int masterWidth = Math.max(80, listWidth / 2 - 12);
+        enableAllCheckbox = addRenderableWidget(Checkbox.builder(
+                Component.translatable("option.stepped_player_animations.entities.enable_all"),
+                font
+        ).pos(blockLeft + 8, 50)
+                .selected(allEntitiesEnabled())
+                .onValueChange((ignored, selected) -> {
+                    if (!synchronizingControls) {
+                        SteppedAnimationConfig.setEntityTypesEnabled(entityTypes, selected);
+                        synchronizeControls();
+                    }
+                })
+                .maxWidth(masterWidth)
+                .build());
+
+        disableAllCheckbox = addRenderableWidget(Checkbox.builder(
+                Component.translatable("option.stepped_player_animations.entities.disable_all"),
+                font
+        ).pos(blockLeft + listWidth / 2 + 4, 50)
+                .selected(allEntitiesDisabled())
+                .onValueChange((ignored, selected) -> {
+                    if (!synchronizingControls) {
+                        SteppedAnimationConfig.setEntityTypesEnabled(entityTypes, !selected);
+                        synchronizeControls();
+                    }
+                })
+                .maxWidth(masterWidth)
+                .build());
+
+        entityTypeList = new EntityTypeList(
                 minecraft,
+                this::synchronizeControls,
+                entityTypes,
                 listWidth,
-                Math.max(40, height - 104),
-                48,
+                Math.max(40, height - 132),
+                76,
                 24
         );
-        list.setX((width - listWidth) / 2);
-        addRenderableWidget(list);
+        entityTypeList.setX(blockLeft);
+        addRenderableWidget(entityTypeList);
 
         addRenderableWidget(Button.builder(
                 Component.translatable("gui.done"),
@@ -56,13 +95,23 @@ public final class EntityTypeConfigScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(font, title, width / 2, 14, 0xFFFFFFFF);
+        int blockWidth = Math.min(360, width - 32);
+        int blockLeft = (width - blockWidth) / 2;
+        graphics.fill(blockLeft, 38, blockLeft + blockWidth, 72, 0x66000000);
+        graphics.drawCenteredString(font, title, width / 2, 8, 0xFFFFFFFF);
         graphics.drawCenteredString(
                 font,
                 Component.translatable("screen.stepped_player_animations.entities.description"),
                 width / 2,
-                30,
+                22,
                 0xFFAAAAAA
+        );
+        graphics.drawCenteredString(
+                font,
+                Component.translatable("screen.stepped_player_animations.entities.all_block"),
+                width / 2,
+                40,
+                0xFFFFFFFF
         );
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -74,30 +123,78 @@ public final class EntityTypeConfigScreen extends Screen {
         }
     }
 
+    private void synchronizeControls() {
+        if (enableAllCheckbox == null || disableAllCheckbox == null) {
+            return;
+        }
+
+        synchronizingControls = true;
+        try {
+            setCheckboxValue(enableAllCheckbox, allEntitiesEnabled());
+            setCheckboxValue(disableAllCheckbox, allEntitiesDisabled());
+            if (entityTypeList != null) {
+                entityTypeList.synchronizeCheckboxes();
+            }
+        } finally {
+            synchronizingControls = false;
+        }
+    }
+
+    private boolean allEntitiesEnabled() {
+        return entityTypes.stream().allMatch(SteppedAnimationConfig::isEntityTypeEnabled);
+    }
+
+    private boolean allEntitiesDisabled() {
+        return entityTypes.stream().noneMatch(SteppedAnimationConfig::isEntityTypeEnabled);
+    }
+
+    private static void setCheckboxValue(Checkbox checkbox, boolean selected) {
+        if (checkbox.selected() != selected) {
+            checkbox.onPress();
+        }
+    }
+
+    private static List<EntityType<?>> supportedEntityTypes(Minecraft minecraft) {
+        Set<EntityType<?>> supportedTypes = new LinkedHashSet<>();
+        supportedTypes.add(EntityType.PLAYER);
+        Map<EntityType<?>, EntityRenderer<?>> renderers =
+                ((EntityRenderDispatcherAccessor) minecraft.getEntityRenderDispatcher())
+                        .steppedPlayerAnimations$getRenderers();
+        renderers.forEach((entityType, renderer) -> {
+            if (renderer instanceof LivingEntityRenderer<?, ?>
+                    || renderer instanceof BoatRenderer
+                    || renderer instanceof MinecartRenderer<?>) {
+                supportedTypes.add(entityType);
+            }
+        });
+
+        List<EntityType<?>> sortedTypes = new ArrayList<>(supportedTypes);
+        sortedTypes.sort(Comparator.comparing(
+                entityType -> entityType.getDescription().getString(),
+                String.CASE_INSENSITIVE_ORDER
+        ));
+        return List.copyOf(sortedTypes);
+    }
+
     private static final class EntityTypeList extends ContainerObjectSelectionList<EntityTypeEntry> {
-        private EntityTypeList(Minecraft minecraft, int width, int height, int y, int itemHeight) {
+        private EntityTypeList(
+                Minecraft minecraft,
+                Runnable onEntryChanged,
+                List<EntityType<?>> entityTypes,
+                int width,
+                int height,
+                int y,
+                int itemHeight
+        ) {
             super(minecraft, width, height, y, itemHeight);
             centerListVertically = false;
-
-            Set<EntityType<?>> supportedTypes = new LinkedHashSet<>();
-            supportedTypes.add(EntityType.PLAYER);
-            Map<EntityType<?>, EntityRenderer<?>> renderers =
-                    ((EntityRenderDispatcherAccessor) minecraft.getEntityRenderDispatcher())
-                            .steppedPlayerAnimations$getRenderers();
-            renderers.forEach((entityType, renderer) -> {
-                if (renderer instanceof LivingEntityRenderer<?, ?>
-                        || renderer instanceof BoatRenderer
-                        || renderer instanceof MinecartRenderer<?>) {
-                    supportedTypes.add(entityType);
-                }
-            });
-
-            List<EntityType<?>> sortedTypes = new ArrayList<>(supportedTypes);
-            sortedTypes.sort(Comparator.comparing(
-                    entityType -> entityType.getDescription().getString(),
-                    String.CASE_INSENSITIVE_ORDER
+            entityTypes.forEach(entityType -> addEntry(
+                    new EntityTypeEntry(minecraft, entityType, width - 28, onEntryChanged)
             ));
-            sortedTypes.forEach(entityType -> addEntry(new EntityTypeEntry(minecraft, entityType, width - 28)));
+        }
+
+        private void synchronizeCheckboxes() {
+            children().forEach(EntityTypeEntry::synchronizeCheckbox);
         }
 
         @Override
@@ -112,21 +209,44 @@ public final class EntityTypeConfigScreen extends Screen {
     }
 
     private static final class EntityTypeEntry extends ContainerObjectSelectionList.Entry<EntityTypeEntry> {
+        private final EntityType<?> entityType;
         private final Checkbox checkbox;
+        private boolean synchronizing;
 
-        private EntityTypeEntry(Minecraft minecraft, EntityType<?> entityType, int maxWidth) {
+        private EntityTypeEntry(
+                Minecraft minecraft,
+                EntityType<?> entityType,
+                int maxWidth,
+                Runnable onChanged
+        ) {
+            this.entityType = entityType;
             ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
             Component tooltipText = entityId == null
                     ? entityType.getDescription()
                     : Component.literal(entityId.toString());
             checkbox = Checkbox.builder(entityType.getDescription(), minecraft.font)
                     .selected(SteppedAnimationConfig.isEntityTypeEnabled(entityType))
-                    .onValueChange((ignored, selected) ->
-                            SteppedAnimationConfig.setEntityTypeEnabled(entityType, selected)
-                    )
+                    .onValueChange((ignored, selected) -> {
+                        if (!synchronizing) {
+                            SteppedAnimationConfig.setEntityTypeEnabled(entityType, selected);
+                            onChanged.run();
+                        }
+                    })
                     .tooltip(Tooltip.create(tooltipText))
                     .maxWidth(maxWidth)
                     .build();
+        }
+
+        private void synchronizeCheckbox() {
+            boolean selected = SteppedAnimationConfig.isEntityTypeEnabled(entityType);
+            if (checkbox.selected() != selected) {
+                synchronizing = true;
+                try {
+                    checkbox.onPress();
+                } finally {
+                    synchronizing = false;
+                }
+            }
         }
 
         @Override

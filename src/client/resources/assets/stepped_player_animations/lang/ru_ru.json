@@ -15,5 +15,9 @@
   "tooltip.stepped_player_animations.frame_rate": "Переключает частоту кадров анимации. Чем больше число, тем плавнее движения",
   "option.stepped_player_animations.entities": "Настроить сущности...",
   "screen.stepped_player_animations.entities.title": "Настройка сущностей",
-  "screen.stepped_player_animations.entities.description": "Галочка включает глобальную частоту для этого типа сущности"
+  "screen.stepped_player_animations.entities.description": "Галочка включает глобальную частоту для этого типа сущности",
+  "screen.stepped_player_animations.entities.all_block": "Все сущности",
+  "option.stepped_player_animations.entities.enable_all": "Включить всех",
+  "option.stepped_player_animations.entities.disable_all": "Отключить всех",
+  "tooltip.stepped_player_animations.entities": "Включает или отключает ступенчатую анимацию у отдельных сущностей. Вы можете отключить эффект у желаемых сущностей или отключить её вообще у всех. Включено у всех по умолчанию"
 }

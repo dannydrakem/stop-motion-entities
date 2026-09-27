@@ -15,6 +15,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -97,6 +98,23 @@ public final class SteppedAnimationConfig {
         boolean changed = entityEnabled
                 ? disabledEntityTypes.remove(entityId.toString())
                 : disabledEntityTypes.add(entityId.toString());
+        if (changed) {
+            revision++;
+            save();
+        }
+    }
+
+    public static void setEntityTypesEnabled(Collection<EntityType<?>> entityTypes, boolean entityEnabled) {
+        boolean changed = false;
+        for (EntityType<?> entityType : entityTypes) {
+            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+            if (entityId == null) {
+                continue;
+            }
+            changed |= entityEnabled
+                    ? disabledEntityTypes.remove(entityId.toString())
+                    : disabledEntityTypes.add(entityId.toString());
+        }
         if (changed) {
             revision++;
             save();

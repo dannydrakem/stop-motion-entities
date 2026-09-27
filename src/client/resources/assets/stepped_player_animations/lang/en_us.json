@@ -15,5 +15,9 @@
   "tooltip.stepped_player_animations.frame_rate": "Changes the animation frame rate. Higher values make movement smoother",
   "option.stepped_player_animations.entities": "Configure entities...",
   "screen.stepped_player_animations.entities.title": "Entity settings",
-  "screen.stepped_player_animations.entities.description": "A checkmark applies the global frame rate to this entity type"
+  "screen.stepped_player_animations.entities.description": "A checkmark applies the global frame rate to this entity type",
+  "screen.stepped_player_animations.entities.all_block": "All entities",
+  "option.stepped_player_animations.entities.enable_all": "Enable all",
+  "option.stepped_player_animations.entities.disable_all": "Disable all",
+  "tooltip.stepped_player_animations.entities": "Enables or disables stepped animation for individual entities. You can disable the effect for selected entities or disable it for all of them. Enabled for all entities by default"
 }
