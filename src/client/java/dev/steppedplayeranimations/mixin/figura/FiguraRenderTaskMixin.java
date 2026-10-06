@@ -8,11 +8,7 @@ import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-/**
- * Keeps Figura render-task transforms on the same sampled frame as their parent model part.
- * Item, block, text and entity tasks own a separate customization object, so sampling only the
- * avatar's bones lets those attachments continue moving between stepped frames.
- */
+// Render tasks have their own transforms and must use the same sample as the parent model part.
 @Pseudo
 @Mixin(value = RenderTask.class, remap = false)
 abstract class FiguraRenderTaskMixin {

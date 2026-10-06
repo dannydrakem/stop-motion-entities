@@ -1,4 +1,6 @@
 /work/
+/tmp/
+/output/
 /.gradle/
 /build/
 /run/
