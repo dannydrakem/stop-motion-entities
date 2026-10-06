@@ -48,6 +48,17 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
             return true;
         }
 
+        // Final-pose sampling is useful for every EMF/ETF resource pack. The remaining EMF
+        // compatibility Mixins bridge Emotecraft/player-animation/bendy-lib specifically and
+        // must retain their stricter dependency checks.
+        if (mixinClassName.endsWith("EmfFinalPoseSamplerMixin")) {
+            boolean apply = loader.isModLoaded(EMF);
+            if (apply) {
+                LOGGER.info("Applying standalone EMF animation Mixin: EmfFinalPoseSamplerMixin");
+            }
+            return apply;
+        }
+
         if (!loader.isModLoaded(EMF) || !loader.isModLoaded(EMOTECRAFT)) {
             return false;
         }

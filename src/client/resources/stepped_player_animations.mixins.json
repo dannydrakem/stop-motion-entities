@@ -13,6 +13,7 @@
     "vehicle.BoatPaddleSamplerMixin",
     "vehicle.MinecartWobbleSamplerMixin",
     "figura.FiguraAvatarRendererMixin",
+    "figura.FiguraRenderTaskMixin",
     "emf.EmfAnimationPartRestoreMixin",
     "emf.EmfBendyBridgeMixin",
     "emf.EmfBendyCubeRenderMixin",
