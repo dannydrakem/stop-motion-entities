@@ -12,6 +12,7 @@
     "vanilla.VanillaLivingEntityPoseSamplerMixin",
     "vehicle.BoatPaddleSamplerMixin",
     "vehicle.MinecartWobbleSamplerMixin",
+    "figura.FiguraAvatarRendererMixin",
     "emf.EmfAnimationPartRestoreMixin",
     "emf.EmfBendyBridgeMixin",
     "emf.EmfBendyCubeRenderMixin",

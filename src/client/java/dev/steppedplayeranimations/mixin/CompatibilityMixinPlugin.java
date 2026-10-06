@@ -16,6 +16,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
     private static final String EMOTECRAFT = "emotecraft";
     private static final String PLAYER_ANIMATOR = "playeranimator";
     private static final String BENDY_LIB = "bendy-lib";
+    private static final String FIGURA = "figura";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -29,6 +30,13 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         FabricLoader loader = FabricLoader.getInstance();
+        if (mixinClassName.contains(".figura.")) {
+            boolean apply = loader.isModLoaded(FIGURA);
+            if (apply) {
+                LOGGER.info("Applying Figura compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
+            }
+            return apply;
+        }
         if (mixinClassName.endsWith("AgeableListModelAccessor")
                 || mixinClassName.endsWith("EntityRenderDispatcherAccessor")
                 || mixinClassName.endsWith("InventoryEntityRenderContextMixin")

@@ -52,6 +52,7 @@ dependencies {
 
     // Optional at runtime, but present at compile time so Mixin can validate the two pinned EMF targets.
     compileOnly "maven.modrinth:entity-model-features:3.3.9-fabric-1.21"
+    modCompileOnly "maven.modrinth:s9gIPDom:ugF3NunW"
     modCompileOnly "dev.kosmx.player-anim:player-animation-lib-fabric:2.0.4+1.21.1"
     modCompileOnly "io.github.kosmx.bendy-lib:bendy-lib-fabric:5.1"
     modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
