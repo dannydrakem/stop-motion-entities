@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Mixin(value = RenderTask.class, remap = false)
 abstract class FiguraRenderTaskMixin {
     @ModifyArg(
-            method = "render(Lorg/figuramc/figura/model/PartCustomization$PartCustomizationStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V",
+            method = "render",
             at = @At(
                     value = "INVOKE",
                     target = "Lorg/figuramc/figura/model/PartCustomization$PartCustomizationStack;push(Lorg/figuramc/figura/model/PartCustomization;)V"
