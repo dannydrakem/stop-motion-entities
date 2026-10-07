@@ -4,6 +4,7 @@
   "version": "${version}",
   "name": "Stop Motion Entities",
   "description": "Give Minecraft animations a stylized, handcrafted stop-motion look. Choose the animation frame rate for players, mobs, and vehicles while keeping their movement smooth — perfect for cinematic videos, machinima, and creative content.",
+  "license": "MIT",
   "environment": "client",
   "entrypoints": {
     "client": [

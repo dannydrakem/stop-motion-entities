@@ -41,3 +41,7 @@ gradlew.bat build
 ```
 
 Готовый JAR создаётся в `build/libs/`.
+
+## Лицензия
+
+Исходный код распространяется по лицензии [MIT](LICENSE). Автор — Danny Drake.
