@@ -81,12 +81,12 @@ abstract class PlayerAnimatorArmorBridgeMixin {
 
         if (active && !steppedPlayerAnimations$loggedActiveBridge) {
             steppedPlayerAnimations$loggedActiveBridge = true;
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Forwarding PlayerAnimator limb and torso bends to humanoid armor layers."
             );
         } else if (!active && steppedPlayerAnimations$loggedActiveBridge && !steppedPlayerAnimations$loggedReset) {
             steppedPlayerAnimations$loggedReset = true;
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Cleared the retained PlayerAnimator bends from humanoid armor layers."
             );
         }

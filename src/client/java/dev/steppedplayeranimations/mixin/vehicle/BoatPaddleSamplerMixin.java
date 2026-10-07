@@ -64,7 +64,7 @@ abstract class BoatPaddleSamplerMixin {
             state.restore(leftPaddle, rightPaddle);
             if (!steppedPlayerAnimations$logged) {
                 steppedPlayerAnimations$logged = true;
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Stepped boat-paddle hold active at {} FPS; boat movement and hull rocking remain smooth.",
                         SteppedAnimationConfig.frameRate().framesPerSecond()
                 );

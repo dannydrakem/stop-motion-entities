@@ -190,7 +190,7 @@ abstract class EmfFinalPoseSamplerMixin {
                 state.snapshot.capture();
             }
             if (LOGGED_CAPTURE_MODELS.add(modelName)) {
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Stepped final-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
                         SteppedAnimationConfig.frameRate().framesPerSecond(),
                         modelName,
@@ -202,7 +202,7 @@ abstract class EmfFinalPoseSamplerMixin {
         } else {
             state.snapshot.restore();
             if (LOGGED_HOLD_MODELS.add(modelName)) {
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Stepped final-pose hold confirmed between samples: model={}, entity={}, parts={}.",
                         modelName, entityId, parts.size()
                 );

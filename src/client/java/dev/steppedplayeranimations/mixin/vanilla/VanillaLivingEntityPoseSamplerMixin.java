@@ -129,7 +129,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
                 state.snapshot.capture();
             }
             if (steppedPlayerAnimations$LOGGED_CAPTURE_MODELS.add(modelName)) {
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Stepped vanilla-pose sampling active: fps={}, model={}, entity={}, parts={}, interval={} ns.",
                         SteppedAnimationConfig.frameRate().framesPerSecond(),
                         modelName,
@@ -141,7 +141,7 @@ abstract class VanillaLivingEntityPoseSamplerMixin {
         } else {
             state.snapshot.restore();
             if (steppedPlayerAnimations$LOGGED_HOLD_MODELS.add(modelName)) {
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Stepped vanilla-pose hold confirmed: model={}, entity={}, parts={}.",
                         modelName, entity.getUUID(), parts.size()
                 );

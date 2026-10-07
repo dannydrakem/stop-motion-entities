@@ -110,7 +110,7 @@ abstract class EmfBendyCubeRenderMixin {
                 );
                 if (!steppedPlayerAnimations$loggedBendyRender) {
                     steppedPlayerAnimations$loggedBendyRender = true;
-                    SteppedPlayerAnimationsClient.LOGGER.info(
+                    SteppedPlayerAnimationsClient.LOGGER.debug(
                             "Rendering BendyLib-deformed EMF geometry with its original UV layout."
                     );
                 }

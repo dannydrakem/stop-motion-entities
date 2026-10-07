@@ -33,7 +33,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains(".figura.")) {
             boolean apply = loader.isModLoaded(FIGURA);
             if (apply) {
-                LOGGER.info("Applying Figura compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
+                LOGGER.debug("Applying Figura compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
             }
             return apply;
         }
@@ -44,7 +44,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.endsWith("VanillaLivingEntityPoseSamplerMixin")
                 || mixinClassName.endsWith("BoatPaddleSamplerMixin")
                 || mixinClassName.endsWith("MinecartWobbleSamplerMixin")) {
-            LOGGER.info("Applying standalone animation Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
+            LOGGER.debug("Applying standalone animation Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
             return true;
         }
 
@@ -52,7 +52,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("EmfFinalPoseSamplerMixin")) {
             boolean apply = loader.isModLoaded(EMF);
             if (apply) {
-                LOGGER.info("Applying standalone EMF animation Mixin: EmfFinalPoseSamplerMixin");
+                LOGGER.debug("Applying standalone EMF animation Mixin: EmfFinalPoseSamplerMixin");
             }
             return apply;
         }
@@ -75,7 +75,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
         }
 
         if (apply) {
-            LOGGER.info("Applying compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
+            LOGGER.debug("Applying compatibility Mixin: {}", mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1));
         }
         return apply;
     }

@@ -85,7 +85,7 @@ abstract class MinecartWobbleSamplerMixin {
             state.initialized = true;
         } else if (!steppedPlayerAnimations$logged && Math.abs(angle) >= 0.0001F) {
             steppedPlayerAnimations$logged = true;
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Stepped minecart hit-wobble hold active at {} FPS; rail movement and orientation remain smooth.",
                     SteppedAnimationConfig.frameRate().framesPerSecond()
             );

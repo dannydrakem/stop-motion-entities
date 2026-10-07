@@ -81,9 +81,9 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
         requireMod(missing, "bendy-lib");
 
         if (missing.isEmpty()) {
-            LOGGER.info("Compatibility bridge enabled: Emotecraft-controlled parts override FA, free parts retain FA animation, and bend data is forwarded to visible EMF cubes.");
+            LOGGER.debug("Compatibility bridge enabled: Emotecraft-controlled parts override FA, free parts retain FA animation, and bend data is forwarded to visible EMF cubes.");
         } else {
-            LOGGER.info("Compatibility bridge inactive; optional test-stack mods not loaded: {}", String.join(", ", missing));
+            LOGGER.debug("Optional compatibility components not loaded: {}", String.join(", ", missing));
         }
     }
 

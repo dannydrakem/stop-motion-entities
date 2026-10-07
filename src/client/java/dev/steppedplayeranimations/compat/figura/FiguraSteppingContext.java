@@ -52,7 +52,7 @@ public final class FiguraSteppingContext {
 
         if (!logged) {
             logged = true;
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Figura avatar stepped-animation sampling active at {} FPS.",
                     SteppedAnimationConfig.frameRate().framesPerSecond()
             );

@@ -146,7 +146,7 @@ abstract class EmfBendyBridgeMixin {
                 if (active
                         && Math.abs(bend.getRight()) >= 0.0001F
                         && LOGGED_NON_ZERO_BEND_SOURCES.add(mapping.getValue())) {
-                    SteppedPlayerAnimationsClient.LOGGER.info(
+                    SteppedPlayerAnimationsClient.LOGGER.debug(
                             "Forwarding non-zero bend to FA Player cubes: source={}, axis={}, angle={}",
                             mapping.getValue(), bend.getLeft(), bend.getRight()
                     );
@@ -291,7 +291,7 @@ abstract class EmfBendyBridgeMixin {
             String mask = String.join(", ", controlledGroups);
             if (!mask.equals(lastLoggedBlendMask)) {
                 lastLoggedBlendMask = mask;
-                SteppedPlayerAnimationsClient.LOGGER.info(
+                SteppedPlayerAnimationsClient.LOGGER.debug(
                         "Partial FA/Emotecraft blend active; Emotecraft controls: [{}]",
                         mask
                 );
@@ -362,7 +362,7 @@ abstract class EmfBendyBridgeMixin {
             }
             if (!embeddedFacialBranches.isEmpty()) {
                 if (LOGGED_EMBEDDED_HEAD_RIGS.add(id)) {
-                    SteppedPlayerAnimationsClient.LOGGER.info(
+                    SteppedPlayerAnimationsClient.LOGGER.debug(
                             "Embedded EMF facial rig detected under '{}'; using safe emote pause for nested branches {}.",
                             id,
                             embeddedFacialBranches
@@ -378,7 +378,7 @@ abstract class EmfBendyBridgeMixin {
 
     private static void steppedPlayerAnimations$logLiveHeadBranch(String id, int partCount) {
         if (!id.isEmpty() && LOGGED_LIVE_HEAD_BRANCHES.add(id)) {
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Independent EMF facial branch '{}' detected; keeping {} internal parts live during Emotecraft.",
                     id,
                     partCount

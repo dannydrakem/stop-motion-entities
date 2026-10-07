@@ -46,7 +46,7 @@ public final class EmfPausedPartSnapshots {
         }
         if (!loggedRestore && !snapshots.isEmpty()) {
             loggedRestore = true;
-            SteppedPlayerAnimationsClient.LOGGER.info(
+            SteppedPlayerAnimationsClient.LOGGER.debug(
                     "Restoring {} PlayerAnimator-controlled EMF parts after FA animation evaluation.",
                     snapshots.size()
             );
