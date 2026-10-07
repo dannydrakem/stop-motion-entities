@@ -3,13 +3,7 @@
   "id": "stepped_player_animations",
   "version": "${version}",
   "name": "Stepped Player Animations",
-  "description": "Client-side stepped animation rendering for players, mobs, vehicles, and custom Figura avatars.",
-  "authors": [
-    "Danny Drake"
-  ],
-  "contact": {
-    "email": "danny.drake.mc@gmail.com"
-  },
+  "description": "Client-side stepped animation rendering for players, mobs, and vehicles.",
   "environment": "client",
   "entrypoints": {
     "client": [
