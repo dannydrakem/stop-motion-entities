@@ -7,6 +7,7 @@ import dev.steppedplayeranimations.config.SteppedAnimationConfig;
 import dev.steppedplayeranimations.render.SteppedRenderContext;
 import dev.steppedplayeranimations.timing.SteppedAnimationClock;
 import dev.steppedplayeranimations.timing.ExpiringStateCache;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,6 +28,8 @@ import java.util.WeakHashMap;
 @Pseudo
 @Mixin(targets = "traben.entity_model_features.models.parts.EMFModelPartWithState", remap = false)
 abstract class EmfFinalPoseSamplerMixin {
+    private static final boolean HOLD_MY_ITEMS_LOADED =
+            FabricLoader.getInstance().isModLoaded("hold-my-items");
     private static final Map<Object, ContextSamples> SAMPLES = new WeakHashMap<>();
     private static final Map<Object, List<ModelPart>> ROOT_PARTS = new WeakHashMap<>();
     private static Method getRoot;
@@ -65,7 +68,11 @@ abstract class EmfFinalPoseSamplerMixin {
                 return;
             }
             Object root = getRoot.invoke(this);
-            boolean isolatedRenderPass = isInHand.getBoolean(null) || isLayerPhase.getBoolean(null);
+            boolean handRender = isInHand.getBoolean(null);
+            if (handRender && HOLD_MY_ITEMS_LOADED) {
+                return;
+            }
+            boolean isolatedRenderPass = handRender || isLayerPhase.getBoolean(null);
             if (root == this && isolatedRenderPass) {
                 List<ModelPart> parts = steppedPlayerAnimations$parts(root, (ModelPart) root);
                 if (steppedPlayerAnimations$poseBeforeRender == null
@@ -120,11 +127,15 @@ abstract class EmfFinalPoseSamplerMixin {
 
             Object manager = getEmfManager.invoke(null);
             long renderSequence = entityRenderCount.getLong(manager);
+            boolean handRender = isInHand.getBoolean(null);
+            if (handRender && HOLD_MY_ITEMS_LOADED) {
+                return;
+            }
             steppedPlayerAnimations$sample(
                     root,
                     (ModelPart) root,
                     entity.getUUID(),
-                    isInHand.getBoolean(null),
+                    handRender,
                     emfModelName,
                     renderSequence,
                     SteppedAnimationClock.nowNanos()

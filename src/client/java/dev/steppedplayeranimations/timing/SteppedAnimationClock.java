@@ -7,6 +7,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public final class SteppedAnimationClock {
+    private static final ThreadLocal<RenderFrame> RENDER_FRAME =
+            ThreadLocal.withInitial(RenderFrame::new);
     private static boolean initialized;
     private static Method flashbackVisualMillis;
     private static boolean flashbackClockFailed;
@@ -15,6 +17,33 @@ public final class SteppedAnimationClock {
     }
 
     public static long nowNanos() {
+        RenderFrame frame = RENDER_FRAME.get();
+        if (frame.depth > 0) {
+            return frame.nowNanos;
+        }
+        return readNowNanos();
+    }
+
+    public static void beginRenderFrame() {
+        RenderFrame frame = RENDER_FRAME.get();
+        /*
+         * Flashback may render several output frames from inside Minecraft's
+         * normal render loop.  Refresh on every GameRenderer entry so each of
+         * those frames gets its own sample.  This also makes the clock recover
+         * automatically if another mod aborts a render before our RETURN hook.
+         */
+        frame.depth++;
+        frame.nowNanos = readNowNanos();
+    }
+
+    public static void endRenderFrame() {
+        RenderFrame frame = RENDER_FRAME.get();
+        if (frame.depth > 0) {
+            frame.depth--;
+        }
+    }
+
+    private static long readNowNanos() {
         initialize();
         if (flashbackVisualMillis != null && !flashbackClockFailed) {
             try {
@@ -29,6 +58,11 @@ public final class SteppedAnimationClock {
             }
         }
         return System.nanoTime();
+    }
+
+    private static final class RenderFrame {
+        private int depth;
+        private long nowNanos;
     }
 
     private static void initialize() {
