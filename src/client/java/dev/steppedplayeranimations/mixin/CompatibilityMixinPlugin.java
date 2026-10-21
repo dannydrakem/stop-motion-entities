@@ -41,6 +41,7 @@ public final class CompatibilityMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.endsWith("EntityRenderDispatcherAccessor")
                 || mixinClassName.endsWith("GameRendererFrameClockMixin")
                 || mixinClassName.endsWith("InventoryEntityRenderContextMixin")
+                || mixinClassName.endsWith("ItemEntityAnimationSamplerMixin")
                 || mixinClassName.endsWith("ModelPartChildrenAccessor")
                 || mixinClassName.endsWith("VanillaLivingEntityPoseSamplerMixin")
                 || mixinClassName.endsWith("BoatPaddleSamplerMixin")

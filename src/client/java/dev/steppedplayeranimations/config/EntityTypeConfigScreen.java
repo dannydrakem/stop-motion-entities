@@ -14,6 +14,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.entity.BoatRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.ItemEntityRenderer;
 import net.minecraft.client.renderer.entity.MinecartRenderer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -175,13 +176,15 @@ public final class EntityTypeConfigScreen extends Screen {
     private static List<EntityType<?>> supportedEntityTypes(Minecraft minecraft) {
         Set<EntityType<?>> supportedTypes = new LinkedHashSet<>();
         supportedTypes.add(EntityType.PLAYER);
+        supportedTypes.add(EntityType.ITEM);
         Map<EntityType<?>, EntityRenderer<?>> renderers =
                 ((EntityRenderDispatcherAccessor) minecraft.getEntityRenderDispatcher())
                         .steppedPlayerAnimations$getRenderers();
         renderers.forEach((entityType, renderer) -> {
             if (renderer instanceof LivingEntityRenderer<?, ?>
                     || renderer instanceof BoatRenderer
-                    || renderer instanceof MinecartRenderer<?>) {
+                    || renderer instanceof MinecartRenderer<?>
+                    || renderer instanceof ItemEntityRenderer) {
                 supportedTypes.add(entityType);
             }
         });

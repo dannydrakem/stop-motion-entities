@@ -39,12 +39,20 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
             "key.category.stepped_player_animations"
     );
 
+    private static final KeyMapping OPEN_SETTINGS_KEY = new KeyMapping(
+            "key.stepped_player_animations.open_settings",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_SEMICOLON,
+            "key.category.stepped_player_animations"
+    );
+
     @Override
     public void onInitializeClient() {
         SteppedAnimationConfig.load();
         KeyBindingHelper.registerKeyBinding(TOGGLE_KEY);
         KeyBindingHelper.registerKeyBinding(PREVIOUS_FRAME_RATE_KEY);
         KeyBindingHelper.registerKeyBinding(NEXT_FRAME_RATE_KEY);
+        KeyBindingHelper.registerKeyBinding(OPEN_SETTINGS_KEY);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.screen != null) {
                 return;
@@ -70,6 +78,12 @@ public final class SteppedPlayerAnimationsClient implements ClientModInitializer
             while (NEXT_FRAME_RATE_KEY.consumeClick()) {
                 SteppedAnimationConfig.cycleFrameRateForward();
                 showFrameRateMessage(client.player);
+            }
+            if (OPEN_SETTINGS_KEY.consumeClick()) {
+                while (OPEN_SETTINGS_KEY.consumeClick()) {
+                    // Drain repeated presses before opening the screen.
+                }
+                client.setScreen(new SteppedAnimationsConfigScreen(null));
             }
         });
 

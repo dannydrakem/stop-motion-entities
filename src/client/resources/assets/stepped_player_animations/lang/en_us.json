@@ -3,6 +3,7 @@
   "key.stepped_player_animations.toggle": "Toggle stop-motion animation",
   "key.stepped_player_animations.previous_frame_rate": "Previous animation frame rate",
   "key.stepped_player_animations.next_frame_rate": "Next animation frame rate",
+  "key.stepped_player_animations.open_settings": "Open Stop Motion Entities settings",
   "message.stepped_player_animations.enabled": "Stop-motion animation: %s",
   "message.stepped_player_animations.frame_rate": "Animation frame rate: %s",
   "screen.stepped_player_animations.title": "Stop-Motion Animation",

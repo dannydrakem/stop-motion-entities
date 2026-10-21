@@ -3,6 +3,7 @@
   "key.stepped_player_animations.toggle": "Включить/выключить покадровую анимацию",
   "key.stepped_player_animations.previous_frame_rate": "Предыдущая частота анимации",
   "key.stepped_player_animations.next_frame_rate": "Следующая частота анимации",
+  "key.stepped_player_animations.open_settings": "Открыть настройки Stop Motion Entities",
   "message.stepped_player_animations.enabled": "Покадровая анимация: %s",
   "message.stepped_player_animations.frame_rate": "Частота анимации: %s",
   "screen.stepped_player_animations.title": "Покадровая анимация",

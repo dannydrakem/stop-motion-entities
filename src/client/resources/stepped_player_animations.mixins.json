@@ -9,6 +9,7 @@
     "vanilla.EntityRenderDispatcherAccessor",
     "vanilla.GameRendererFrameClockMixin",
     "vanilla.InventoryEntityRenderContextMixin",
+    "vanilla.ItemEntityAnimationSamplerMixin",
     "vanilla.ModelPartChildrenAccessor",
     "vanilla.VanillaLivingEntityPoseSamplerMixin",
     "vehicle.BoatPaddleSamplerMixin",
